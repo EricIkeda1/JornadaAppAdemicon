@@ -26,6 +26,18 @@ class _DashboardState extends State<Dashboard> {
       email: 'carlos@empresa.com.br',
       status: 'Expirado',
     ),
+    Lead(
+      name: 'Fernanda Costa',
+      phone: '(43) 97777-8888',
+      email: 'fernanda@email.com',
+      status: 'Ativo',
+    ),
+    Lead(
+      name: 'João Pereira',
+      phone: '(43) 96666-9999',
+      email: 'joao@email.com',
+      status: 'Convertido',
+    ),
   ];
 
   List<Lead> filteredLeads = [];
@@ -62,6 +74,247 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  void _abrirNovoLead(BuildContext context) {
+    final ScrollController _scrollController = ScrollController();
+    final TextEditingController nomeController = TextEditingController();
+    final TextEditingController telefoneController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController nascimentoController = TextEditingController();
+    final TextEditingController classificacaoController = TextEditingController();
+    final TextEditingController observacoesController = TextEditingController();
+
+    final TextEditingController estabelecimentoController = TextEditingController();
+    final TextEditingController responsavelController = TextEditingController();
+    final TextEditingController enderecoController = TextEditingController();
+    final TextEditingController dataVisitaController = TextEditingController();
+    final TextEditingController retornoPrevistoController = TextEditingController();
+    final TextEditingController valorPropostaController = TextEditingController();
+    String? categoriaVenda;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          insetPadding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Novo Lead",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  const TabBar(
+                    tabs: [
+                      Tab(text: "Dados Básicos"),
+                      Tab(text: "P.A.P."),
+                    ],
+                  ),
+
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Informações do Lead", style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: nomeController,
+                                decoration: const InputDecoration(
+                                  labelText: "Nome *",
+                                  hintText: "Nome completo",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: telefoneController,
+                                decoration: const InputDecoration(
+                                  labelText: "Telefone *",
+                                  hintText: "(43) 99999-9999",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: emailController,
+                                decoration: const InputDecoration(
+                                  labelText: "E-mail",
+                                  hintText: "email@exemplo.com",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: nascimentoController,
+                                decoration: const InputDecoration(
+                                  labelText: "Data de Nascimento",
+                                  hintText: "dd/mm/aaaa",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: classificacaoController,
+                                decoration: const InputDecoration(
+                                  labelText: "Classificação",
+                                  hintText: "Ex: 200k; investidor",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: observacoesController,
+                                maxLines: 3,
+                                decoration: const InputDecoration(
+                                  labelText: "Observações",
+                                  hintText: "Observações gerais sobre o lead",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("P.A.P. - Plano de Ação Personalizada", style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: estabelecimentoController,
+                                decoration: const InputDecoration(
+                                  labelText: "Nome do Estabelecimento",
+                                  hintText: "Razão social ou nome fantasia",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: responsavelController,
+                                decoration: const InputDecoration(
+                                  labelText: "Nome do Responsável",
+                                  hintText: "Pessoa responsável",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: enderecoController,
+                                decoration: const InputDecoration(
+                                  labelText: "Endereço",
+                                  hintText: "Endereço completo",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: dataVisitaController,
+                                decoration: const InputDecoration(
+                                  labelText: "Data da Visita",
+                                  hintText: "dd/mm/aaaa",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: retornoPrevistoController,
+                                decoration: const InputDecoration(
+                                  labelText: "Retorno Previsto",
+                                  hintText: "dd/mm/aaaa",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: categoriaVenda,
+                                items: ["Categoria 1", "Categoria 2", "Categoria 3"]
+                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                    .toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    categoriaVenda = val;
+                                  });
+                                },
+                                decoration: const InputDecoration(
+                                  labelText: "Categoria de Venda",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: valorPropostaController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: "Valor da Proposta (R\$)",
+                                  hintText: "0,00",
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Cancelar"),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                            ),
+                            onPressed: () {
+                            },
+                            child: const Text("Criar Lead"),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,8 +342,7 @@ class _DashboardState extends State<Dashboard> {
                 right: 12,
                 child: Text(
                   "J",
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               )
             ],
@@ -105,13 +357,14 @@ class _DashboardState extends State<Dashboard> {
         onItemSelected: _onItemSelected,
         selectedIndex: _selectedIndex,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _abrirNovoLead(context),
+            child: Container(
               width: double.infinity,
+              margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(14.0),
               decoration: BoxDecoration(
                 color: Colors.black,
@@ -124,37 +377,46 @@ class _DashboardState extends State<Dashboard> {
                   SizedBox(width: 8),
                   Text(
                     'Novo Lead',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold),
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+          ),
 
-            Row(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
               children: [
-                Expanded(child: _buildSummaryCard(Icons.people, "Total", leads.length, Colors.black)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildSummaryCard(Icons.check_circle, "Ativos", _countLeadsByStatus("Ativo"), Colors.green)),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildSummaryCard(Icons.people, "Total", leads.length, Colors.black)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _buildSummaryCard(Icons.check_circle, "Ativos", _countLeadsByStatus("Ativo"), Colors.green)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildSummaryCard(Icons.warning, "Expirados", _countLeadsByStatus("Expirado"), Colors.red)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _buildSummaryCard(Icons.trending_up, "Convertidos", _countLeadsByStatus("Convertido"), Colors.blue)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildVencendoCard("Vencendo", _countLeadsByStatus("Vencendo")),
+                const SizedBox(height: 16),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildSummaryCard(Icons.warning, "Expirados", _countLeadsByStatus("Expirado"), Colors.red)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildSummaryCard(Icons.trending_up, "Convertidos", _countLeadsByStatus("Convertido"), Colors.blue)),
-              ],
-            ),
-            const SizedBox(height: 12),
+          ),
 
-            _buildVencendoCard("Vencendo", _countLeadsByStatus("Vencendo")),
-            const SizedBox(height: 16),
-
-            TextField(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: "Buscar por nome ou telefone...",
@@ -167,9 +429,12 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            Container(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.grey[200],
@@ -177,20 +442,24 @@ class _DashboardState extends State<Dashboard> {
               ),
               child: const Text("Todos"),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            Row(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("Lista de Leads", style: TextStyle(fontWeight: FontWeight.bold)),
                 Text("${filteredLeads.length} leads"),
               ],
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
 
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: filteredLeads.length,
               itemBuilder: (context, index) {
                 final lead = filteredLeads[index];
@@ -210,8 +479,7 @@ class _DashboardState extends State<Dashboard> {
                         children: [
                           Text(
                             lead.name,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -221,8 +489,7 @@ class _DashboardState extends State<Dashboard> {
                             ),
                             child: Text(
                               lead.status,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 12),
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
                             ),
                           ),
                         ],
@@ -245,10 +512,10 @@ class _DashboardState extends State<Dashboard> {
                       ),
                       const SizedBox(height: 4),
                       Row(
-                        children: [
-                          const Icon(Icons.person, size: 16, color: Colors.black54),
-                          const SizedBox(width: 6),
-                          const Text("João Silva"),
+                        children: const [
+                          Icon(Icons.person, size: 16, color: Colors.black54),
+                          SizedBox(width: 6),
+                          Text("João Silva"),
                         ],
                       ),
                     ],
@@ -256,8 +523,8 @@ class _DashboardState extends State<Dashboard> {
                 );
               },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -279,11 +546,8 @@ class _DashboardState extends State<Dashboard> {
             const SizedBox(height: 6),
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text(
-              value.toString(),
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.bold, color: color),
-            ),
+            Text(value.toString(),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
       ),
@@ -305,21 +569,14 @@ class _DashboardState extends State<Dashboard> {
                 const SizedBox(width: 6),
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
               value.toString(),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.orange,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange),
             ),
           ],
         ),

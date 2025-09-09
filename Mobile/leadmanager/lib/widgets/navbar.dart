@@ -108,24 +108,46 @@ class NavBar extends StatelessWidget {
   Widget _buildNavItem(IconData icon, String title, int index) {
     final bool isSelected = selectedIndex == index;
 
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? Colors.white : Colors.black,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.black : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-        ),
+      child: Row(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 5,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.red : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          Expanded(
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Icon(
+                icon,
+                color: isSelected ? Colors.white : Colors.black,
+              ),
+              title: Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              trailing: isSelected
+                  ? const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white)
+                  : null,
+              onTap: () => onItemSelected(index),
+            ),
+          ),
+        ],
       ),
-      tileColor: isSelected ? Colors.black : Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      selected: isSelected,
-      onTap: () => onItemSelected(index),
     );
   }
 }
