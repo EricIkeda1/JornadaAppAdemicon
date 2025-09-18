@@ -58,7 +58,7 @@ class HomeGestor extends StatelessWidget {
                     boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
                   ),
                   tabs: const [
-                    Tab(text: 'Dashboard'),
+                    Tab(text: 'Minhas Vistas'),
                     Tab(text: 'Consultores'),
                     Tab(text: 'Designar Trabalho'),
                     Tab(text: 'Todos os Clientes'),
