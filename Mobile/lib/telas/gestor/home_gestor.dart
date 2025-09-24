@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_navbar.dart';
 import '../widgets/stat_card.dart';
-import 'dashboard_tab.dart';
+import 'minhas_visitas.dart';
 import 'consultores_tab.dart';
 import 'designar_trabalho_tab.dart';
 import 'todos_clientes_tab.dart';

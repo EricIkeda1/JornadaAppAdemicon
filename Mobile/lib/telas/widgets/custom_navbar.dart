@@ -1,11 +1,10 @@
-// lib/telas/widgets/custom_navbar.dart
 import 'package:flutter/material.dart';
 
 class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
   final String nome;
   final String cargo;
-  final List<Tab>? tabs;            // agora opcional
-  final bool tabsNoAppBar;          // controla a posição das abas
+  final List<Tab>? tabs;            
+  final bool tabsNoAppBar;        
   final VoidCallback? onLogout;
 
   const CustomNavbar({
@@ -13,7 +12,7 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
     required this.nome,
     required this.cargo,
     this.tabs,
-    this.tabsNoAppBar = true,       // padrão mantém compatibilidade
+    this.tabsNoAppBar = true,       
     this.onLogout,
   });
 
