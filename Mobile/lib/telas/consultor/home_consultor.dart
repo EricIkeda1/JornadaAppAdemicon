@@ -68,7 +68,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
                                   'Próximas Visitas Programadas',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                    fontSize: 16,
                                   ),
                                 ),
                               ),
@@ -131,13 +131,13 @@ class _HomeConsultorState extends State<HomeConsultor> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _statCardIcon(
-                        title: 'Total de Clientes',
+                        title: 'Clientes',
                         value: '0',
                         icon: Icons.people_alt,
                         color: Colors.blue,
                       ),
                       _statCardIcon(
-                        title: 'Visitas Este Mês',
+                        title: 'Visitas',
                         value: '0',
                         icon: Icons.place,
                         color: Colors.green,
