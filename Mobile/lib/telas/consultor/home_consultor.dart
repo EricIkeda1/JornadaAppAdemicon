@@ -37,86 +37,88 @@ class _HomeConsultorState extends State<HomeConsultor> {
 
                   Card(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    elevation: 2,
+                    elevation: 1,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Container(
-                                width: 28,
-                                height: 28,
+                                width: 22,
+                                height: 22,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEFFAF1),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(5),
                                   border: Border.all(color: const Color(0xFFDCEFE1)),
                                 ),
                                 child: const Icon(
                                   Icons.place,
-                                  size: 16,
+                                  size: 13,
                                   color: Color(0xFF3CB371),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               const Expanded(
                                 child: Text(
                                   'Próximas Visitas Programadas',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 2),
                           Text(
                             'Ruas designadas pelo gestor para os próximos dias',
                             style: TextStyle(
                               color: Colors.black.withOpacity(0.6),
-                              fontSize: 12,
+                              fontSize: 11,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
                           ListTile(
                             leading: Container(
-                              width: 36,
-                              height: 36,
+                              width: 28,
+                              height: 28,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF2F5FF),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: Colors.black12),
                               ),
                               child: const Icon(
                                 Icons.place_outlined,
                                 color: Color(0xFF2F6FED),
-                                size: 20,
+                                size: 16,
                               ),
                             ),
                             title: const Text(
-                              'Avenida Principal, Bairro Comercial - Shopping e Lojas',
+                              'Av. Principal, Bairro Comercial',
+                              style: TextStyle(fontSize: 13),
                             ),
                             subtitle: const Text(
-                              'quinta-feira, 18 de setembro de 2025',
+                              'qui, 18 de setembro de 2025',
+                              style: TextStyle(fontSize: 11),
                             ),
                             trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.black,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
                                 'Hoje',
-                                style: TextStyle(color: Colors.white, fontSize: 12),
+                                style: TextStyle(color: Colors.white, fontSize: 11),
                               ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                           ),
                         ],
                       ),
@@ -233,36 +235,36 @@ class _HomeConsultorState extends State<HomeConsultor> {
   }) {
     return Expanded(
       child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 14,
+                    radius: 12,
                     backgroundColor: color.withOpacity(0.12),
-                    child: Icon(icon, color: color, size: 18),
+                    child: Icon(icon, color: color, size: 16),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 11),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 value,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  fontSize: 16,
                 ),
               ),
             ],
