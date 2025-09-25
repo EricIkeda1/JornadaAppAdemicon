@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_navbar.dart';
 import '../widgets/stat_card.dart';
 import 'minhas_visitas.dart';
-import 'consultores_tab.dart';
+import 'cadastrar_consultores.dart';
 import 'designar_trabalho_tab.dart';
 import 'todos_clientes_tab.dart';
 import 'relatorios_tab.dart';
@@ -25,16 +25,49 @@ class HomeGestor extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(12),
               child: GridView.count(
-                crossAxisCount: 1,
+                crossAxisCount: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                childAspectRatio: 5.5,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 2, 
                 children: const [
-                  StatCard(title: "Cadastros Hoje", value: "0", icon: Icons.event_available, color: Colors.blue),
-                  StatCard(title: "Cadastros Este Mês", value: "0", icon: Icons.stacked_bar_chart, color: Colors.green),
-                  StatCard(title: "Cadastros Este Ano", value: "0", icon: Icons.insert_chart, color: Colors.purple),
-                  StatCard(title: "Consultores Ativos", value: "2", icon: Icons.groups, color: Colors.orange),
+                  SizedBox(
+                    height: 80, 
+                    child: StatCard(
+                      title: "Cadastros Hoje",
+                      value: "0",
+                      icon: Icons.event_available,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  SizedBox(
+                    height: 80,
+                    child: StatCard(
+                      title: "Cadastros Este Mês",
+                      value: "0",
+                      icon: Icons.stacked_bar_chart,
+                      color: Colors.green,
+                    ),
+                  ),
+                  SizedBox(
+                    height: 80,
+                    child: StatCard(
+                      title: "Cadastros Este Ano",
+                      value: "0",
+                      icon: Icons.insert_chart,
+                      color: Colors.purple,
+                    ),
+                  ),
+                  SizedBox(
+                    height: 80,
+                    child: StatCard(
+                      title: "Consultores Ativos",
+                      value: "2",
+                      icon: Icons.groups,
+                      color: Colors.orange,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -51,11 +84,14 @@ class HomeGestor extends StatelessWidget {
                   labelColor: Colors.black,
                   unselectedLabelColor: Colors.black54,
                   indicatorSize: TabBarIndicatorSize.tab,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                  labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 12),
                   indicator: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 2)
+                    ],
                   ),
                   tabs: const [
                     Tab(text: 'Minhas Vistas'),
