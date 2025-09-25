@@ -4,7 +4,7 @@ import '../widgets/trabalho_hoje_card.dart';
 import 'meus_clientes_tab.dart';
 import 'minhas_visitas_tab.dart';
 import 'exportar_dados_tab.dart';
-import 'cadastrar_cliente.dart'; 
+import 'cadastrar_cliente.dart';
 
 class HomeConsultor extends StatefulWidget {
   const HomeConsultor({super.key});
@@ -28,12 +28,14 @@ class _HomeConsultorState extends State<HomeConsultor> {
         ),
         body: Column(
           children: [
+            // Padding externo reduzido de 16 para 12
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
                   const TrabalhoHojeCard(),
-                  const SizedBox(height: 16),
+                  // separação reduzida de 16 para 10
+                  const SizedBox(height: 10),
 
                   Card(
                     shape: RoundedRectangleBorder(
@@ -41,7 +43,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
                     ),
                     elevation: 1,
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      // padding interno reduzido de 8 para 6
+                      padding: const EdgeInsets.all(6),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -62,7 +65,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
                                   color: Color(0xFF3CB371),
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              // gap reduzido de 6 para 4
+                              const SizedBox(width: 4),
                               const Expanded(
                                 child: Text(
                                   'Próximas Visitas Programadas',
@@ -74,6 +78,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
                               ),
                             ],
                           ),
+                          // mantém 2 para título->descrição
                           const SizedBox(height: 2),
                           Text(
                             'Ruas designadas pelo gestor para os próximos dias',
@@ -82,7 +87,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
                               fontSize: 11,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          // de 6 para 4
+                          const SizedBox(height: 4),
                           ListTile(
                             leading: Container(
                               width: 28,
@@ -118,14 +124,19 @@ class _HomeConsultorState extends State<HomeConsultor> {
                                 style: TextStyle(color: Colors.white, fontSize: 11),
                               ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                            // contentPadding horizontal reduzido de 6 para 4
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            // densidade do ListTile mais compacta
+                            dense: true,
+                            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
                           ),
                         ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  // separação reduzida de 16 para 10
+                  const SizedBox(height: 10),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -154,15 +165,17 @@ class _HomeConsultorState extends State<HomeConsultor> {
               ),
             ),
 
+            // TabBar com padding lateral reduzido (mantido 16 -> 12)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Material(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 elevation: 2,
                 child: const TabBar(
                   isScrollable: true,
-                  labelPadding: EdgeInsets.symmetric(horizontal: 14),
+                  // padding do rótulo mais compacto (14 -> 12)
+                  labelPadding: EdgeInsets.symmetric(horizontal: 12),
                   labelColor: Colors.black,
                   unselectedLabelColor: Colors.black54,
                   indicatorSize: TabBarIndicatorSize.tab,
@@ -182,39 +195,40 @@ class _HomeConsultorState extends State<HomeConsultor> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            // gap de 12 -> 8
+            const SizedBox(height: 8),
 
             Expanded(
               child: TabBarView(
                 children: [
                   ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: const [
-                      SizedBox(height: 8),
+                      SizedBox(height: 6),
                       MinhasVisitasTab(),
                     ],
                   ),
 
                   ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: const [
-                      SizedBox(height: 8),
+                      SizedBox(height: 6),
                       CadastrarCliente(),
                     ],
                   ),
 
                   ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: [
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       MeusClientesTab(clientes: []),
                     ],
                   ),
 
                   ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: const [
-                      SizedBox(height: 8),
+                      SizedBox(height: 6),
                       ExportarDadosTab(clientes: []),
                     ],
                   ),
@@ -238,7 +252,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
         elevation: 1,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          // de 8 para 6
+          padding: const EdgeInsets.all(6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -249,7 +264,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
                     backgroundColor: color.withOpacity(0.12),
                     child: Icon(icon, color: color, size: 16),
                   ),
-                  const SizedBox(width: 6),
+                  // de 6 para 4
+                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       title,
@@ -259,7 +275,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              // de 6 para 4
+              const SizedBox(height: 4),
               Text(
                 value,
                 style: const TextStyle(
