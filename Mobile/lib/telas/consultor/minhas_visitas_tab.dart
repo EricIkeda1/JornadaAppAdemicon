@@ -48,9 +48,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() {
-      setState(() => _query = _searchCtrl.text.trim());
-    });
+    _searchCtrl.addListener(() => setState(() => _query = _searchCtrl.text.trim()));
   }
 
   @override
@@ -64,7 +62,9 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
     final cs = Theme.of(context).colorScheme;
 
     Widget cardWrapper({required String title, required Widget child}) {
-      return Card.outlined(
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -169,8 +169,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
       ),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
         cardPesquisa,
         const SizedBox(height: 12),

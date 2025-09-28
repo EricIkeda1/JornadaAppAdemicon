@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../models/cliente.dart';
+import '../../services/cliente_service.dart';
 
 class CadastrarCliente extends StatefulWidget {
-  const CadastrarCliente({super.key});
+  final Function()? onClienteCadastrado;
+  const CadastrarCliente({super.key, this.onClienteCadastrado});
 
   @override
   State<CadastrarCliente> createState() => _CadastrarClienteState();
@@ -10,6 +13,7 @@ class CadastrarCliente extends StatefulWidget {
 
 class _CadastrarClienteState extends State<CadastrarCliente> {
   final _formKey = GlobalKey<FormState>();
+  final _clienteService = ClienteService();
 
   final _nomeEstabelecimentoCtrl = TextEditingController();
   final _enderecoCtrl = TextEditingController();
@@ -35,20 +39,43 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     super.dispose();
   }
 
-  void _salvar() {
+  Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Cliente cadastrado com sucesso!')),
-    );
+    try {
+      final cliente = Cliente(
+        estabelecimento: _nomeEstabelecimentoCtrl.text.trim(),
+        endereco: _enderecoCtrl.text.trim(),
+        dataVisita: DateFormat('dd/MM/yyyy').parse(_dataVisitaCtrl.text),
+        nomeCliente: _nomeClienteCtrl.text.trim().isEmpty ? null : _nomeClienteCtrl.text.trim(),
+        telefone: _telefoneCtrl.text.trim().isEmpty ? null : _telefoneCtrl.text.trim(),
+        observacoes: _observacoesCtrl.text.trim().isEmpty ? null : _observacoesCtrl.text.trim(),
+      );
 
-    _formKey.currentState?.reset();
-    _nomeEstabelecimentoCtrl.clear();
-    _enderecoCtrl.clear();
-    _nomeClienteCtrl.clear();
-    _telefoneCtrl.clear();
-    _observacoesCtrl.clear();
-    _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      await _clienteService.saveCliente(cliente);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cliente cadastrado com sucesso!')),
+        );
+
+        _formKey.currentState?.reset();
+        _nomeEstabelecimentoCtrl.clear();
+        _enderecoCtrl.clear();
+        _nomeClienteCtrl.clear();
+        _telefoneCtrl.clear();
+        _observacoesCtrl.clear();
+        _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
+
+        widget.onClienteCadastrado?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao cadastrar cliente: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _pickDate() async {
@@ -119,7 +146,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         );
 
     return _CardBase(
-      child: Padding(
+      child: SingleChildScrollView(   
         padding: const EdgeInsets.all(12),
         child: Form(
           key: _formKey,
@@ -131,7 +158,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               Text('Preencha os dados do cliente para cadastro', style: subtle),
 
               const SizedBox(height: 16),
-
               Text('Dados Obrigatórios', style: titleStyle),
               const SizedBox(height: 8),
 
@@ -172,7 +198,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               ),
 
               const SizedBox(height: 16),
-
               Text('Dados Opcionais', style: titleStyle),
               const SizedBox(height: 8),
 
@@ -215,7 +240,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               ),
 
               const SizedBox(height: 16),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
