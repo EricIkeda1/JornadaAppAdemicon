@@ -1,50 +1,72 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:csv/csv.dart';
 import 'package:flutter/services.dart';
 import 'dart:io' as io;
+import 'dart:convert' as convert; 
+import 'dart:html' as html; 
 import 'package:path_provider/path_provider.dart';
+import 'package:file_selector/file_selector.dart';
 import '../../models/cliente.dart';
 
 class ExportarDadosTab extends StatelessWidget {
   final List<Cliente> clientes;
   const ExportarDadosTab({super.key, required this.clientes});
 
-  String _toCsv(List<Cliente> list) {
-    final rows = <List<dynamic>>[
-      ['Estabelecimento', 'Endereço', 'Data da Visita', 'Nome do Cliente', 'Telefone', 'Observações'],
-      ...list.map((c) => [
-            c.estabelecimento,
-            c.endereco,
-            '${c.dataVisita.day.toString().padLeft(2, '0')}/${c.dataVisita.month.toString().padLeft(2, '0')}/${c.dataVisita.year}',
-            c.nomeCliente ?? '',
-            c.telefone ?? '',
-            (c.observacoes ?? '').replaceAll('\n', ' ').trim(),
-          ]),
-    ];
-    return const ListToCsvConverter().convert(rows);
-  }
-
-  String _onlyNotes(List<Cliente> list) {
+  String _toCsvExcel(List<Cliente> list) {
     final buffer = StringBuffer();
+    buffer.write('\uFEFF'); 
+    buffer.writeln('sep=;');
+    buffer.writeln('Estabelecimento;Estado;Cidade;Endereço;Data da Visita;Nome do Cliente;Telefone;Observações');
+    
     for (final c in list) {
-      buffer.writeln('Estabelecimento: ${c.estabelecimento}');
-      buffer.writeln('Endereço: ${c.endereco}');
-      buffer.writeln(
-          'Data: ${c.dataVisita.day.toString().padLeft(2, '0')}/${c.dataVisita.month.toString().padLeft(2, '0')}/${c.dataVisita.year}');
-      if ((c.nomeCliente ?? '').isNotEmpty) buffer.writeln('Cliente: ${c.nomeCliente}');
-      if ((c.telefone ?? '').isNotEmpty) buffer.writeln('Telefone: ${c.telefone}');
-      buffer.writeln('Observações: ${c.observacoes ?? '-'}');
-      buffer.writeln('---');
+      final row = [
+        c.estabelecimento,
+        c.estado,
+        c.cidade,
+        c.endereco,
+        '${c.dataVisita.day.toString().padLeft(2, '0')}/${c.dataVisita.month.toString().padLeft(2, '0')}/${c.dataVisita.year}', 
+        c.nomeCliente ?? '',
+        c.telefone ?? '',
+        (c.observacoes ?? '').replaceAll('\n', ' ').trim(),
+      ];
+      buffer.writeln(row.map((e) => '"${e.replaceAll('"', '""')}"').join(';'));
     }
     return buffer.toString();
   }
 
-  Future<void> _downloadFileMobile(String content, String fileName) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = io.File('${dir.path}/$fileName');
-    await file.writeAsString(content);
-    print('Arquivo salvo em: ${file.path}');
+  void _downloadWeb(String content, String fileName, String mimeType) {
+    final bytes = convert.utf8.encode(content);
+    final blob = html.Blob([bytes], mimeType);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.document.createElement('a') as html.AnchorElement
+      ..href = url
+      ..download = fileName
+      ..style.display = 'none';
+    
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    html.document.body?.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
+  }
+
+  Future<void> _saveFile(String content, String fileName, String mimeType) async {
+    if (kIsWeb) {
+      _downloadWeb(content, fileName, mimeType);
+      return;
+    }
+
+    if (io.Platform.isWindows || io.Platform.isLinux || io.Platform.isMacOS) {
+      final typeGroup = XTypeGroup(label: 'text', extensions: [fileName.split('.').last]);
+      final path = await getSavePath(suggestedName: fileName, acceptedTypeGroups: [typeGroup]);
+      if (path == null) return;
+      final file = io.File(path);
+      await file.writeAsString(content);
+    } else {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = io.File('${dir.path}/$fileName');
+      await file.writeAsString(content);
+      print('Arquivo salvo em: ${file.path}');
+    }
   }
 
   Future<void> _downloadCSV(BuildContext context) async {
@@ -52,41 +74,28 @@ class ExportarDadosTab extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nada para exportar')));
       return;
     }
-
-    if (kIsWeb) {
-      await Clipboard.setData(ClipboardData(text: _toCsv(clientes)));
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV copiado para clipboard!')));
-    } else {
-      await _downloadFileMobile(_toCsv(clientes), 'clientes.csv');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV salvo no dispositivo!')));
+    
+    try {
+      await _saveFile(_toCsvExcel(clientes), 'clientes.csv', 'text/csv;charset=utf-8');
+      
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV baixado com sucesso!')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV salvo no dispositivo!')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao baixar: $e')));
     }
   }
 
-  Future<void> _downloadTXT(BuildContext context) async {
-    if (clientes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nada para exportar')));
-      return;
-    }
-
-    if (kIsWeb) {
-      await Clipboard.setData(ClipboardData(text: _onlyNotes(clientes)));
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('TXT copiado para clipboard!')));
-    } else {
-      await _downloadFileMobile(_onlyNotes(clientes), 'observacoes.txt');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('TXT salvo no dispositivo!')));
-    }
-  }
-
-  Future<void> _copyToClipboard(BuildContext context, {bool isCSV = true}) async {
+  Future<void> _copyToClipboard(BuildContext context) async {
     if (clientes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nada para copiar')));
       return;
     }
-    final content = isCSV ? _toCsv(clientes) : _onlyNotes(clientes);
+    final content = _toCsvExcel(clientes);
     await Clipboard.setData(ClipboardData(text: content));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${isCSV ? 'CSV' : 'TXT'} copiado para área de transferência!')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV copiado para área de transferência!')));
   }
 
   @override
@@ -101,25 +110,14 @@ class ExportarDadosTab extends StatelessWidget {
           children: [
             const Text('Exportar para CRM', style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-
             _exportCard(
               context,
-              title: 'Exportar CSV Completo',
-              description: 'Contém todos os dados dos clientes em formato de tabela',
+              title: 'Exportar CSV para Excel',
+              description: 'Todos os dados dos clientes em formato de planilha',
               onDownload: () => _downloadCSV(context),
-              onCopy: () => _copyToClipboard(context, isCSV: true),
+              onCopy: () => _copyToClipboard(context),
             ),
             const SizedBox(height: 12),
-
-            _exportCard(
-              context,
-              title: 'Exportar Observações',
-              description: 'Apenas as observações dos clientes em formato de texto',
-              onDownload: () => _downloadTXT(context),
-              onCopy: () => _copyToClipboard(context, isCSV: false),
-            ),
-            const SizedBox(height: 12),
-
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -129,8 +127,7 @@ class ExportarDadosTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Clientes cadastrados: ${clientes.length}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text('Clientes cadastrados: ${clientes.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -155,16 +152,9 @@ class ExportarDadosTab extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                    child: ElevatedButton(
-                        onPressed: onDownload,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                        child: const Text('Baixar'))),
+                Expanded(child: ElevatedButton(onPressed: onDownload, style: ElevatedButton.styleFrom(backgroundColor: Colors.black), child: const Text('Baixar'))),
                 const SizedBox(width: 8),
-                Expanded(
-                    child: OutlinedButton(
-                        onPressed: onCopy,
-                        child: const Text('Copiar'))),
+                Expanded(child: OutlinedButton(onPressed: onCopy, child: const Text('Copiar'))),
               ],
             ),
           ],

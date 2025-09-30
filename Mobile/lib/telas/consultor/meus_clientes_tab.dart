@@ -38,14 +38,14 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
-    
+
     setState(() {
       final Cliente item = _clientes.removeAt(oldIndex);
       _clientes.insert(newIndex, item);
     });
 
     await _salvarOrdemClientes();
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ordem dos clientes atualizada!')),
@@ -62,7 +62,9 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
   @override
   Widget build(BuildContext context) {
     final filtrados = _clientes.where((c) {
-      final hay = '${c.estabelecimento} ${c.endereco} ${c.nomeCliente ?? ''}'.toLowerCase();
+      final hay =
+          '${c.estabelecimento} ${c.estado} ${c.cidade} ${c.endereco} ${c.nomeCliente ?? ''}'
+              .toLowerCase(); 
       return hay.contains(_q.toLowerCase());
     }).toList();
 
@@ -72,20 +74,22 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch, 
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Meus Clientes', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text('Meus Clientes',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               TextField(
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
-                  hintText: 'Buscar por nome de estabelecimento, endereço ou cliente...',
+                  hintText:
+                      'Buscar por nome de estabelecimento, estado, cidade, endereço ou cliente...',
                   border: OutlineInputBorder(),
                 ),
                 onChanged: (v) => setState(() => _q = v),
               ),
               const SizedBox(height: 12),
-              
+
               if (filtrados.isEmpty)
                 const Expanded(
                   child: Center(
@@ -102,21 +106,26 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                     onReorder: _onReorder,
                     itemBuilder: (context, index) {
                       final c = filtrados[index];
-                      final data = '${c.dataVisita.day.toString().padLeft(2, '0')}/${c.dataVisita.month.toString().padLeft(2, '0')}/${c.dataVisita.year}';
-                      
+                      final data =
+                          '${c.dataVisita.day.toString().padLeft(2, '0')}/${c.dataVisita.month.toString().padLeft(2, '0')}/${c.dataVisita.year}';
+
                       return Column(
                         key: Key(c.id),
                         children: [
                           ListTile(
-                            leading: const Icon(Icons.drag_handle, color: Colors.grey),
+                            leading:
+                                const Icon(Icons.drag_handle, color: Colors.grey),
                             title: Text(c.estabelecimento),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(c.endereco),
-                                if (c.nomeCliente != null) Text('Cliente: ${c.nomeCliente}'),
-                                if (c.telefone != null) Text('Telefone: ${c.telefone}'),
-                                if (c.observacoes != null) Text('Obs: ${c.observacoes}'),
+                                Text('${c.estado} - ${c.cidade} - ${c.endereco}'),
+                                if (c.nomeCliente != null)
+                                  Text('Cliente: ${c.nomeCliente}'),
+                                if (c.telefone != null)
+                                  Text('Telefone: ${c.telefone}'),
+                                if (c.observacoes != null)
+                                  Text('Obs: ${c.observacoes}'),
                                 Text('Data: $data'),
                               ],
                             ),
@@ -162,7 +171,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       try {
         await _clienteService.removeCliente(cliente.id);
         await _refreshClientes();
-        widget.onClienteRemovido?.call(); 
+        widget.onClienteRemovido?.call();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

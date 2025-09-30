@@ -1,5 +1,7 @@
 class Cliente {
   final String estabelecimento;
+  final String estado;
+  final String cidade; // 👈 adicionado
   final String endereco;
   final DateTime dataVisita;
   final String? nomeCliente;
@@ -9,6 +11,8 @@ class Cliente {
 
   Cliente({
     required this.estabelecimento,
+    required this.estado,
+    required this.cidade,
     required this.endereco,
     required this.dataVisita,
     this.nomeCliente,
@@ -21,6 +25,8 @@ class Cliente {
     return {
       'id': id,
       'estabelecimento': estabelecimento,
+      'estado': estado,
+      'cidade': cidade,
       'endereco': endereco,
       'dataVisita': dataVisita.toIso8601String(),
       'nomeCliente': nomeCliente,
@@ -33,6 +39,8 @@ class Cliente {
     return Cliente(
       id: json['id'],
       estabelecimento: json['estabelecimento'],
+      estado: json['estado'],
+      cidade: json['cidade'],
       endereco: json['endereco'],
       dataVisita: DateTime.parse(json['dataVisita']),
       nomeCliente: json['nomeCliente'],

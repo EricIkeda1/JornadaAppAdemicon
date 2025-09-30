@@ -16,6 +16,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
   final _clienteService = ClienteService();
 
   final _nomeEstabelecimentoCtrl = TextEditingController();
+  final _estadoCtrl = TextEditingController();
+  final _cidadeCtrl = TextEditingController(); 
   final _enderecoCtrl = TextEditingController();
   final _dataVisitaCtrl = TextEditingController();
   final _nomeClienteCtrl = TextEditingController();
@@ -31,6 +33,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
   @override
   void dispose() {
     _nomeEstabelecimentoCtrl.dispose();
+    _estadoCtrl.dispose();
+    _cidadeCtrl.dispose();
     _enderecoCtrl.dispose();
     _dataVisitaCtrl.dispose();
     _nomeClienteCtrl.dispose();
@@ -45,6 +49,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     try {
       final cliente = Cliente(
         estabelecimento: _nomeEstabelecimentoCtrl.text.trim(),
+        estado: _estadoCtrl.text.trim(),
+        cidade: _cidadeCtrl.text.trim(), 
         endereco: _enderecoCtrl.text.trim(),
         dataVisita: DateFormat('dd/MM/yyyy').parse(_dataVisitaCtrl.text),
         nomeCliente: _nomeClienteCtrl.text.trim().isEmpty ? null : _nomeClienteCtrl.text.trim(),
@@ -61,6 +67,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
         _formKey.currentState?.reset();
         _nomeEstabelecimentoCtrl.clear();
+        _estadoCtrl.clear();
+        _cidadeCtrl.clear(); 
         _enderecoCtrl.clear();
         _nomeClienteCtrl.clear();
         _telefoneCtrl.clear();
@@ -146,7 +154,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         );
 
     return _CardBase(
-      child: SingleChildScrollView(   
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
         child: Form(
           key: _formKey,
@@ -168,6 +176,26 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                   hint: 'Digite o nome do estabelecimento',
                 ),
                 validator: (v) => _required(v, field: 'Nome do Estabelecimento'),
+              ),
+              const SizedBox(height: 10),
+
+              TextFormField(
+                controller: _estadoCtrl,
+                decoration: _dec(
+                  'Estado *',
+                  hint: 'Digite o estado (ex: SP, RJ...)',
+                ),
+                validator: (v) => _required(v, field: 'Estado'),
+              ),
+              const SizedBox(height: 10),
+
+              TextFormField(
+                controller: _cidadeCtrl,
+                decoration: _dec(
+                  'Cidade *',
+                  hint: 'Digite a cidade',
+                ),
+                validator: (v) => _required(v, field: 'Cidade'),
               ),
               const SizedBox(height: 10),
 
