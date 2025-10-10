@@ -41,8 +41,7 @@ class _LoginPageState extends State<LoginPage> {
         if (!userDoc.exists) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content:
-                  Text('Usuário não encontrado no sistema. Contate o administrador.'),
+              content: Text('Usuário não encontrado no sistema. Contate o administrador.'),
             ),
           );
           setState(() => _loading = false);
@@ -55,8 +54,7 @@ class _LoginPageState extends State<LoginPage> {
         if (tipo == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content:
-                  Text('Tipo de usuário não definido. Contate o administrador.'),
+              content: Text('Tipo de usuário não definido. Contate o administrador.'),
             ),
           );
           setState(() => _loading = false);
@@ -124,8 +122,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
           Center(
             child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               child: Form(
                 key: _formKey,
                 child: ConstrainedBox(
@@ -144,15 +141,14 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         keyboardType: TextInputType.emailAddress,
-                        autocorrect: false, 
-                        enableSuggestions: false, 
-                        textCapitalization: TextCapitalization.none, 
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textCapitalization: TextCapitalization.none,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Informe o e-mail';
                           }
-                          final emailRegex = RegExp(
-                              r'^[^@]+@[^@]+\.[^@]+');
+                          final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
                           if (!emailRegex.hasMatch(value)) {
                             return 'Email inválido';
                           }
@@ -167,16 +163,24 @@ class _LoginPageState extends State<LoginPage> {
                           labelText: "Senha",
                           suffixIcon: IconButton(
                             icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
+                            onPressed: () => setState(() => _obscure = !_obscure),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        validator: (v) =>
-                            (v?.isEmpty ?? true) ? 'Informe a senha' : null,
+                        validator: (v) => (v?.isEmpty ?? true) ? 'Informe a senha' : null,
                         onFieldSubmitted: (_) => _login(),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/recuperar');
+                          },
+                          child: const Text('Esqueceu a senha?'),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -192,13 +196,13 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           onPressed: _loading ? null : _login,
                           child: _loading
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white)
+                              ? const CircularProgressIndicator(color: Colors.white)
                               : const Text(
                                   "Entrar",
                                   style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                         ),
                       ),
