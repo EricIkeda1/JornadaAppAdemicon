@@ -63,7 +63,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
             ? null
             : _observacoesCtrl.text.trim(),
         consultorResponsavel:
-            "Consultor Teste", // 👈 Substitua pelo nome do consultor logado
+            "Consultor Teste", 
       );
 
       await _clienteService.saveCliente(cliente);

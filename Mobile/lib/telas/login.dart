@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
@@ -8,28 +10,103 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _userCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _obscure = true;
+  bool _loading = false;
 
   @override
   void dispose() {
-    _userCtrl.dispose();
+    _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
-  void _login() {
-    final user = _userCtrl.text.trim().toLowerCase();
-    final pass = _passCtrl.text;
-    if ((user == 'gestor' || user == 'consultor') && pass == '123456') {
-      final route = user == 'gestor' ? '/gestor' : '/consultor';
-      Navigator.pushReplacementNamed(context, route);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenciais inválidas')),
-      );
+  Future<void> _login() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _loading = true);
+      try {
+        final email = _emailCtrl.text.trim();
+        final password = _passCtrl.text;
+
+        final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+
+        final userDoc = await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Usuário não encontrado no sistema. Contate o administrador.'),
+            ),
+          );
+          setState(() => _loading = false);
+          return;
+        }
+
+        final data = userDoc.data()!;
+        final tipo = data['tipo'] as String?;
+
+        if (tipo == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tipo de usuário não definido. Contate o administrador.'),
+            ),
+          );
+          setState(() => _loading = false);
+          return;
+        }
+
+        String route;
+        if (tipo == 'gestor' || tipo == 'supervisor') {
+          route = '/gestor';
+        } else if (tipo == 'consultor') {
+          route = '/consultor';
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tipo de usuário inválido.'),
+            ),
+          );
+          setState(() => _loading = false);
+          return;
+        }
+
+        Navigator.pushReplacementNamed(context, route);
+      } on FirebaseAuthException catch (e) {
+        String mensagem = 'Erro: ';
+        switch (e.code) {
+          case 'user-not-found':
+            mensagem = 'Usuário não encontrado';
+            break;
+          case 'wrong-password':
+            mensagem = 'Senha incorreta';
+            break;
+          case 'invalid-email':
+            mensagem = 'Email inválido';
+            break;
+          case 'network-request-failed':
+            mensagem = 'Sem conexão com a internet';
+            break;
+          default:
+            mensagem = 'Erro ao fazer login';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(mensagem)),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.toString()}')),
+        );
+      } finally {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -43,10 +120,7 @@ class _LoginPageState extends State<LoginPage> {
             right: 0,
             top: 0,
             bottom: 0,
-            child: Image.asset(
-              "assets/Linha_Lateral.png",
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset("assets/Linha_Lateral.png", fit: BoxFit.cover),
           ),
           Center(
             child: SingleChildScrollView(
@@ -61,15 +135,15 @@ class _LoginPageState extends State<LoginPage> {
                       Image.asset("assets/Logo.png", height: 120),
                       const SizedBox(height: 40),
                       TextFormField(
-                        controller: _userCtrl,
+                        controller: _emailCtrl,
                         decoration: InputDecoration(
-                          labelText: "Usuário (gestor ou consultor)",
+                          labelText: "E-mail",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Informe o usuário' : null,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) => (v?.isEmpty ?? true) ? 'Informe o e-mail' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -85,8 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        validator: (v) =>
-                            (v == null || v.isEmpty) ? 'Informe a senha' : null,
+                        validator: (v) => (v?.isEmpty ?? true) ? 'Informe a senha' : null,
                         onFieldSubmitted: (_) => _login(),
                       ),
                       const SizedBox(height: 24),
@@ -101,20 +174,18 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _login();
-                            }
-                          },
-                          child: const Text(
-                            "Continuar",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
+                          onPressed: _loading ? null : _login,
+                          child: _loading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  "Entrar",
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Use: gestor 123456 | consultor 123456',
+                        'Use o e-mail e senha cadastrados',
                         style: TextStyle(color: Colors.black54),
                       ),
                     ],

@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
-import 'package:mask_text_input_formatter/mask_text_input_formatter.dart'; 
-import 'package:email_validator/email_validator.dart'; 
+import 'package:email_validator/email_validator.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'package:flutter/services.dart'; // ✅ Importação corrigida
 
 class ConsultoresTab extends StatefulWidget {
   const ConsultoresTab({super.key});
@@ -12,12 +14,11 @@ class ConsultoresTab extends StatefulWidget {
 
 class _ConsultoresTabState extends State<ConsultoresTab> {
   final _formKey = GlobalKey<FormState>();
-
   final _nomeCtrl = TextEditingController();
   final _telefoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
-  final _matriculaCtrl = TextEditingController(); 
+  final _matriculaCtrl = TextEditingController();
   final _fotoCtrl = TextEditingController();
 
   final _telefoneMask = MaskTextInputFormatter(
@@ -25,6 +26,63 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     filter: {'#': RegExp(r'[0-9]')},
     type: MaskAutoCompletionType.eager,
   );
+
+  bool _loading = false;
+
+  Future<void> _cadastrarConsultor() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _loading = true);
+      try {
+        final email = _emailCtrl.text.trim();
+        final senha = _senhaCtrl.text;
+
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: senha,
+        );
+
+        await FirebaseFirestore.instance.collection('consultores').doc(credential.user!.uid).set({
+          'nome': _nomeCtrl.text.trim(),
+          'telefone': _telefoneCtrl.text,
+          'email': email,
+          'matricula': _matriculaCtrl.text.trim(),
+          'foto': _fotoCtrl.text.trim(),
+          'uid': credential.user!.uid,
+          'data_cadastro': FieldValue.serverTimestamp(),
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Consultor cadastrado com sucesso!')),
+        );
+        _limparCampos();
+      } on FirebaseAuthException catch (e) {
+        String mensagem = 'Erro: ${e.message}';
+        if (e.code == 'email-already-in-use') {
+          mensagem = 'E-mail já cadastrado';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(mensagem)),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.toString()}')),
+        );
+      } finally {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _limparCampos() {
+    _formKey.currentState!.reset();
+    _nomeCtrl.clear();
+    _telefoneCtrl.clear();
+    _emailCtrl.clear();
+    _senhaCtrl.clear();
+    _matriculaCtrl.clear();
+    _fotoCtrl.clear();
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -35,24 +93,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     _matriculaCtrl.dispose();
     _fotoCtrl.dispose();
     super.dispose();
-  }
-
-  void _cadastrarConsultor() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Consultor cadastrado!')),
-      );
-
-      _formKey.currentState!.reset();
-      _nomeCtrl.clear();
-      _telefoneCtrl.clear();
-      _emailCtrl.clear();
-      _senhaCtrl.clear();
-      _matriculaCtrl.clear();
-      _fotoCtrl.clear();
-
-      setState(() {});
-    }
   }
 
   @override
@@ -73,7 +113,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                 const SizedBox(height: 8),
                 const Text("Cadastre novos consultores no sistema", style: TextStyle(color: Colors.black54)),
                 const SizedBox(height: 16),
-
                 Center(
                   child: CircleAvatar(
                     radius: 28,
@@ -93,9 +132,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 TextFormField(
                   controller: _nomeCtrl,
                   decoration: const InputDecoration(
@@ -105,9 +142,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                   validator: (v) => (v == null || v.trim().isEmpty) ? "Informe o nome completo" : null,
                   onChanged: (_) => setState(() {}),
                 ),
-
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _telefoneCtrl,
                   decoration: const InputDecoration(
@@ -124,9 +159,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _emailCtrl,
                   decoration: const InputDecoration(
@@ -141,9 +174,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _senhaCtrl,
                   obscureText: true,
@@ -157,9 +188,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _matriculaCtrl,
                   decoration: const InputDecoration(
@@ -169,9 +198,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
-
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _fotoCtrl,
                   decoration: const InputDecoration(
@@ -180,15 +207,15 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _cadastrarConsultor, 
-                    child: const Text("Cadastrar Consultor"),
+                    onPressed: _loading ? null : _cadastrarConsultor,
+                    child: _loading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Cadastrar Consultor"),
                   ),
                 ),
               ],
