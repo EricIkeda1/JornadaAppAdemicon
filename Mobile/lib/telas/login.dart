@@ -33,23 +33,36 @@ class _LoginPageState extends State<LoginPage> {
         final userCredential = await FirebaseAuth.instance
             .signInWithEmailAndPassword(email: email, password: password);
 
-        final userDoc = await FirebaseFirestore.instance
+        final userUid = userCredential.user!.uid;
+
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('gestor')
-            .doc(userCredential.user!.uid)
+            .doc(userUid)
             .get();
 
-        if (!userDoc.exists) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Usuário não encontrado no sistema. Contate o administrador.'),
-            ),
-          );
-          setState(() => _loading = false);
-          return;
-        }
+        String? tipo;
+        String route = '';
 
-        final data = userDoc.data()!;
-        final tipo = data['tipo'] as String?;
+        if (userDoc.exists) {
+          tipo = userDoc.get('tipo') as String?;
+        } else {
+          final consultorDoc = await FirebaseFirestore.instance
+              .collection('consultores')
+              .doc(userUid)
+              .get();
+
+          if (consultorDoc.exists) {
+            tipo = 'consultor'; 
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Usuário não encontrado no sistema. Contate o administrador.'),
+              ),
+            );
+            setState(() => _loading = false);
+            return;
+          }
+        }
 
         if (tipo == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -61,7 +74,6 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        String route;
         if (tipo == 'gestor' || tipo == 'supervisor') {
           route = '/gestor';
         } else if (tipo == 'consultor') {

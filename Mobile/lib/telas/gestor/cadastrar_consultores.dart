@@ -46,21 +46,43 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
         final String email = _emailCtrl.text.trim();
         final String senha = _senhaCtrl.text;
 
+        final gestorDoc = await FirebaseFirestore.instance
+            .collection('gestor')
+            .doc(gestorId)
+            .get();
+
+        if (gestorDoc.exists) {
+          final String gestorEmail = gestorDoc.get('email') as String? ?? '';
+          if (email.toLowerCase() == gestorEmail.toLowerCase()) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Você não pode cadastrar um consultor com seu próprio e-mail.'),
+              ),
+            );
+            setState(() => _loading = false);
+            return;
+          }
+        }
+
+        final consultoresSnapshot = await FirebaseFirestore.instance
+            .collection('consultores')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+
+        if (consultoresSnapshot.docs.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Este e-mail já está cadastrado como consultor.'),
+            ),
+          );
+          setState(() => _loading = false);
+          return;
+        }
+
         final credential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(email: email, password: senha);
         print('✅ Usuário criado: ${credential.user!.uid}');
-
-        await FirebaseFirestore.instance
-            .collection('gestor')
-            .doc(credential.user!.uid)
-            .set({
-          'nome': _nomeCtrl.text.trim(),
-          'email': email,
-          'tipo': 'consultor',
-          'uid': credential.user!.uid,
-          'gestorId': gestorId,
-          'data_criacao': FieldValue.serverTimestamp(),
-        });
 
         await FirebaseFirestore.instance
             .collection('consultores')
@@ -71,8 +93,12 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
           'email': email,
           'matricula': _matriculaCtrl.text.trim(),
           'gestorId': gestorId,
+          'tipo': 'consultor',
+          'uid': credential.user!.uid,
           'data_cadastro': FieldValue.serverTimestamp(),
         });
+
+        print('✅ Consultor salvo em /consultores/${credential.user!.uid}');
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Consultor cadastrado com sucesso!')),
@@ -82,7 +108,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
         print('❌ Auth error: $e');
         String mensagem = 'Erro: ${e.message}';
         if (e.code == 'email-already-in-use') {
-          mensagem = 'E-mail já cadastrado';
+          mensagem = 'E-mail já cadastrado no Firebase';
         } else if (e.code == 'weak-password') {
           mensagem = 'Senha muito fraca';
         }
@@ -119,7 +145,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     setState(() {});
   }
 
-  // Gera as iniciais do nome
   String get _iniciais {
     final nome = _nomeCtrl.text.trim();
     if (nome.isEmpty) return 'CN';

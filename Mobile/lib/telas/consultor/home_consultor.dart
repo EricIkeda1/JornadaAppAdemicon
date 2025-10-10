@@ -1,5 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:flutter/material.dart';
 import '../widgets/custom_navbar.dart';
 import '../widgets/trabalho_hoje_card.dart';
@@ -22,45 +21,24 @@ class _HomeConsultorState extends State<HomeConsultor> {
   int _totalClientes = 0;
   int _totalVisitasHoje = 0;
   List<Cliente> _clientes = [];
-  String _userName = 'Consultor'; // Nome a ser exibido
+  String _userName = 'Consultor'; 
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadUserData(); 
     _loadStats();
   }
 
-  /// Carrega o nome do usuário a partir da coleção 'gestor'
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      // ✅ Busca em 'gestor', não 'usuarios'
-      final doc = await FirebaseFirestore.instance
-          .collection('gestor')
-          .doc(user.uid)
-          .get();
-
-      if (doc.exists) {
-        // Usa o nome cadastrado pelo gestor
-        final nome = doc.get('nome') as String? ?? user.email?.split('@').first ?? 'Consultor';
-        setState(() {
-          _userName = nome;
-        });
-      } else {
-        // Fallback
-        final fallback = user.email?.split('@').first ?? 'Consultor';
-        setState(() {
-          _userName = fallback;
-        });
+    if (user != null) {
+      String name = user.displayName ?? user.email ?? 'Consultor';
+      if (name.contains('@')) {
+        name = name.split('@').first;
       }
-    } catch (e) {
-      print('❌ Erro ao carregar nome do usuário: $e');
-      final fallback = user.email?.split('@').first ?? 'Consultor';
       setState(() {
-        _userName = fallback;
+        _userName = name;
       });
     }
   }
@@ -98,7 +76,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
               ),
             ),
             child: CustomNavbar(
-              nome: _userName, // Usa o nome dinâmico
+              nome: _userName, 
               cargo: 'Consultor',
               tabsNoAppBar: false,
             ),

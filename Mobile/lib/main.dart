@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
@@ -108,58 +108,44 @@ class HomeRedirector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: FirebaseFirestore.instance
-          .collection('gestor')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('gestor')
+            .doc(user.uid)
+            .get();
+
+        if (!doc.exists) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Usuário não encontrado no sistema.')),
           );
+          FirebaseAuth.instance.signOut();
+          return;
         }
 
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Usuário não encontrado no banco de dados.'),
-                  ElevatedButton(
-                    onPressed: () => FirebaseAuth.instance.signOut(),
-                    child: Text('Voltar ao login'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final tipo = snapshot.data!.get('tipo') as String?;
+        final tipo = doc.get('tipo') as String?;
 
         if (tipo == 'gestor' || tipo == 'supervisor') {
-          return const HomeGestor();
+          Navigator.pushReplacementNamed(context, '/gestor');
         } else if (tipo == 'consultor') {
-          return const HomeConsultor();
+          Navigator.pushReplacementNamed(context, '/consultor');
         } else {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Tipo de usuário não reconhecido: $tipo'),
-                  ElevatedButton(
-                    onPressed: () => FirebaseAuth.instance.signOut(),
-                    child: Text('Sair'),
-                  ),
-                ],
-              ),
-            ),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tipo de usuário inválido.')),
           );
+          FirebaseAuth.instance.signOut();
         }
-      },
+      } catch (e) {
+        print('❌ Erro no redirecionamento: $e');
+        FirebaseAuth.instance.signOut();
+      }
+    });
+
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
