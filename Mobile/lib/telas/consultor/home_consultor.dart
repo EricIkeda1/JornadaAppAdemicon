@@ -1,4 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../widgets/custom_navbar.dart';
 import '../widgets/trabalho_hoje_card.dart';
@@ -26,19 +27,63 @@ class _HomeConsultorState extends State<HomeConsultor> {
   @override
   void initState() {
     super.initState();
-    _loadUserData(); 
+    _loadUserData();
     _loadStats();
+  }
+
+  String _formatarNome(String nome) {
+    final partes = nome.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (partes.isEmpty) return 'Consultor';
+    if (partes.length == 1) return partes[0];
+    return '${partes[0]} ${partes.last}';
   }
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      String name = user.displayName ?? user.email ?? 'Consultor';
-      if (name.contains('@')) {
-        name = name.split('@').first;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('consultores')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        final nomeCompleto = doc.get('nome') as String? ?? '';
+        if (nomeCompleto.isNotEmpty) {
+          final nomeFormatado = _formatarNome(nomeCompleto);
+          setState(() {
+            _userName = nomeFormatado;
+          });
+          return;
+        }
       }
+
+      String? displayName = user.displayName;
+      if (displayName != null && displayName.isNotEmpty) {
+        final nomeFormatado = _formatarNome(displayName);
+        setState(() {
+          _userName = nomeFormatado;
+        });
+        return;
+      }
+
+      String? email = user.email;
+      if (email != null) {
+        final nomeEmail = email.split('@').first;
+        setState(() {
+          _userName = nomeEmail;
+        });
+        return;
+      }
+
       setState(() {
-        _userName = name;
+        _userName = 'Consultor';
+      });
+    } catch (e) {
+      print('❌ Erro ao carregar nome do consultor: $e');
+      setState(() {
+        _userName = 'Consultor';
       });
     }
   }

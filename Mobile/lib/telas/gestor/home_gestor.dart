@@ -18,36 +18,33 @@ class HomeGestor extends StatefulWidget {
 
 class _HomeGestorState extends State<HomeGestor> {
   double _collapseProgress = 0.0;
-  String _userName = 'Gestor'; // Será substituído pelo nome real
+  String _userName = 'Gestor';
 
   static const double collapseDistance = 60.0;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData(); // Carrega o nome do gestor
+    _loadUserData();
   }
 
-  /// Carrega o nome do gestor a partir da coleção 'gestor'
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // ✅ Mudança aqui: busca na coleção 'gestor'
       final doc = await FirebaseFirestore.instance
           .collection('gestor')
           .doc(user.uid)
           .get();
 
       if (doc.exists) {
-        // Usa o nome cadastrado no Firestore
-        final nome = doc.get('nome') as String? ?? 'Gestor';
+        final nomeCompleto = doc.get('nome') as String? ?? 'Gestor';
+        final nomeFormatado = _formatarNome(nomeCompleto);
         setState(() {
-          _userName = nome;
+          _userName = nomeFormatado;
         });
       } else {
-        // Fallback: tenta extrair do email
         final fallback = user.email?.split('@').first ?? 'Gestor';
         setState(() {
           _userName = fallback;
@@ -62,13 +59,20 @@ class _HomeGestorState extends State<HomeGestor> {
     }
   }
 
+  String _formatarNome(String nome) {
+    final partes = nome.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (partes.isEmpty) return 'Gestor';
+    if (partes.length == 1) return partes[0];
+    return '${partes[0]} ${partes.last}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 5,
       child: Scaffold(
         appBar: CustomNavbar(
-          nome: _userName, // ✅ Nome dinâmico exibido
+          nome: _userName, 
           cargo: 'Gestor',
           tabsNoAppBar: false,
           collapseProgress: _collapseProgress,

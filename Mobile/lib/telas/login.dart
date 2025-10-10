@@ -52,11 +52,12 @@ class _LoginPageState extends State<LoginPage> {
               .get();
 
           if (consultorDoc.exists) {
-            tipo = 'consultor'; 
+            tipo = 'consultor';
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Usuário não encontrado no sistema. Contate o administrador.'),
+                content: Text(
+                    'Usuário não encontrado no sistema. Contate o administrador.'),
               ),
             );
             setState(() => _loading = false);
@@ -67,7 +68,8 @@ class _LoginPageState extends State<LoginPage> {
         if (tipo == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Tipo de usuário não definido. Contate o administrador.'),
+              content:
+                  Text('Tipo de usuário não definido. Contate o administrador.'),
             ),
           );
           setState(() => _loading = false);
@@ -174,19 +176,24 @@ class _LoginPageState extends State<LoginPage> {
                         decoration: InputDecoration(
                           labelText: "Senha",
                           suffixIcon: IconButton(
-                            icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscure = !_obscure),
+                            icon: Icon(_obscure
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        validator: (v) => (v?.isEmpty ?? true) ? 'Informe a senha' : null,
+                        validator: (v) =>
+                            (v?.isEmpty ?? true) ? 'Informe a senha' : null,
                         onFieldSubmitted: (_) => _login(),
                       ),
                       const SizedBox(height: 8),
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 38.0, right: 7.6),
+                        padding:
+                            const EdgeInsets.only(bottom: 38.0, right: 7.6),
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -198,33 +205,42 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+
+                      Transform.translate(
+                        offset: const Offset(0, -46),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                          ),
-                          onPressed: _loading ? null : _login,
-                          child: _loading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                                  "Entrar",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                            onPressed: _loading ? null : _login,
+                            child: _loading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text(
+                                    "Entrar",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Use o e-mail e senha cadastrados',
-                        style: TextStyle(color: Colors.black54),
+
+                      Transform.translate(
+                        offset: const Offset(0, -40),
+                        child: const Text(
+                          'Use o e-mail e senha cadastrados',
+                          style: TextStyle(color: Colors.black54),
+                        ),
                       ),
                     ],
                   ),
