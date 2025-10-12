@@ -24,101 +24,85 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _loading = true);
-      try {
-        final email = _emailCtrl.text.trim();
-        final password = _passCtrl.text;
+    if (!_formKey.currentState!.validate()) return;
 
-        final userCredential = await FirebaseAuth.instance
-            .signInWithEmailAndPassword(email: email, password: password);
+    setState(() => _loading = true);
 
-        final userUid = userCredential.user!.uid;
+    try {
+      final email = _emailCtrl.text.trim();
+      final password = _passCtrl.text;
 
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('gestor')
-            .doc(userUid)
-            .get();
+      QuerySnapshot gestorQuery = await FirebaseFirestore.instance
+          .collection('gestor')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
 
-        String? tipo;
-        String route = '';
+      QuerySnapshot consultorQuery = await FirebaseFirestore.instance
+          .collection('consultores')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
 
-        if (userDoc.exists) {
-          tipo = userDoc.get('tipo') as String?;
-        } else {
-          final consultorDoc = await FirebaseFirestore.instance
-              .collection('consultores')
-              .doc(userUid)
-              .get();
+      String? tipo;
+      String route = '';
 
-          if (consultorDoc.exists) {
-            tipo = 'consultor';
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                    'Usuário não encontrado no sistema. Contate o administrador.'),
-              ),
-            );
-            setState(() => _loading = false);
-            return;
-          }
-        }
-
-        if (tipo == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Tipo de usuário não definido. Contate o administrador.'),
-            ),
-          );
-          setState(() => _loading = false);
-          return;
-        }
-
-        if (tipo == 'gestor' || tipo == 'supervisor') {
-          route = '/gestor';
-        } else if (tipo == 'consultor') {
-          route = '/consultor';
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tipo de usuário inválido.'),
-            ),
-          );
-          setState(() => _loading = false);
-          return;
-        }
-
-        Navigator.pushReplacementNamed(context, route);
-      } on FirebaseAuthException catch (e) {
-        String mensagem = 'Erro: ';
-        switch (e.code) {
-          case 'user-not-found':
-            mensagem = 'Usuário não encontrado';
-            break;
-          case 'wrong-password':
-            mensagem = 'Senha incorreta';
-            break;
-          case 'invalid-email':
-            mensagem = 'Email inválido';
-            break;
-          case 'network-request-failed':
-            mensagem = 'Sem conexão com a internet';
-            break;
-          default:
-            mensagem = 'Erro ao fazer login';
-        }
+      if (gestorQuery.docs.isNotEmpty) {
+        tipo = gestorQuery.docs.first.get('tipo') as String?;
+      } else if (consultorQuery.docs.isNotEmpty) {
+        tipo = 'consultor';
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(mensagem)),
+          const SnackBar(
+            content: Text(
+                'Usuário não encontrado no sistema. Contate o administrador.'),
+          ),
         );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: ${e.toString()}')),
-        );
-      } finally {
         setState(() => _loading = false);
+        return;
       }
+
+      await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+
+      if (tipo == 'gestor' || tipo == 'supervisor') {
+        route = '/gestor';
+      } else if (tipo == 'consultor') {
+        route = '/consultor';
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tipo de usuário inválido.')),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
+      Navigator.pushReplacementNamed(context, route);
+    } on FirebaseAuthException catch (e) {
+      String mensagem = 'Erro ao fazer login';
+      switch (e.code) {
+        case 'user-not-found':
+          mensagem = 'Usuário não encontrado';
+          break;
+        case 'wrong-password':
+          mensagem = 'Senha incorreta';
+          break;
+        case 'invalid-email':
+          mensagem = 'Email inválido';
+          break;
+        case 'network-request-failed':
+          mensagem = 'Sem conexão com a internet';
+          break;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensagem)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: ${e.toString()}')),
+      );
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -195,8 +179,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 8),
 
                       Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: 38.0, right: 7.6),
+                        padding: const EdgeInsets.only(bottom: 38.0, right: 7.6),
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -209,7 +192,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Botão Entrar com a cor #231F20
                       Transform.translate(
                         offset: const Offset(0, -46),
                         child: SizedBox(
@@ -217,8 +199,7 @@ class _LoginPageState extends State<LoginPage> {
                           height: 48,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color(0xFF231F20), // cor exata
+                              backgroundColor: const Color(0xFF231F20),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -240,7 +221,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Texto de instrução
                       Transform.translate(
                         offset: const Offset(0, -40),
                         child: const Text(
