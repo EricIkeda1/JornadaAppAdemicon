@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/cliente.dart';
 import '../../services/cliente_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,12 +24,20 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
   final _estadoCtrl = TextEditingController();
   final _cidadeCtrl = TextEditingController();
   final _enderecoCtrl = TextEditingController();
+  final _bairroCtrl = TextEditingController();
+  final _cepCtrl = TextEditingController();
   final _dataVisitaCtrl = TextEditingController();
   final _horaVisitaCtrl = TextEditingController();
   final _observacoesCtrl = TextEditingController();
 
   final _telefoneFormatter = MaskTextInputFormatter(
     mask: '(##) #####-####',
+    filter: { "#": RegExp(r'\d') },
+    type: MaskAutoCompletionType.lazy,
+  );
+
+  final _cepFormatter = MaskTextInputFormatter(
+    mask: '#####-###',
     filter: { "#": RegExp(r'\d') },
     type: MaskAutoCompletionType.lazy,
   );
@@ -48,6 +57,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     _estadoCtrl.dispose();
     _cidadeCtrl.dispose();
     _enderecoCtrl.dispose();
+    _bairroCtrl.dispose();
+    _cepCtrl.dispose();
     _dataVisitaCtrl.dispose();
     _horaVisitaCtrl.dispose();
     _observacoesCtrl.dispose();
@@ -61,6 +72,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       final dataHora = DateFormat('dd/MM/yyyy HH:mm')
           .parse('${_dataVisitaCtrl.text} ${_horaVisitaCtrl.text}');
 
+      final user = FirebaseAuth.instance.currentUser;
+
       final cliente = Cliente(
         nomeCliente: _nomeClienteCtrl.text.trim(),
         telefone: _telefoneCtrl.text.trim(),
@@ -68,11 +81,13 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         estado: _estadoCtrl.text.trim(),
         cidade: _cidadeCtrl.text.trim(),
         endereco: _enderecoCtrl.text.trim(),
+        bairro: _bairroCtrl.text.trim().isEmpty ? null : _bairroCtrl.text.trim(),
+        cep: _cepCtrl.text.trim().isEmpty ? null : _cepCtrl.text.trim(),
         dataVisita: dataHora,
         observacoes: _observacoesCtrl.text.trim().isEmpty
             ? null
             : _observacoesCtrl.text.trim(),
-        consultorResponsavel: "Consultor Teste",
+        consultorResponsavel: user?.displayName ?? 'Consultor Desconhecido',
       );
 
       await _clienteService.saveCliente(cliente);
@@ -98,6 +113,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     _estadoCtrl.clear();
     _cidadeCtrl.clear();
     _enderecoCtrl.clear();
+    _bairroCtrl.clear();
+    _cepCtrl.clear();
     _observacoesCtrl.clear();
     _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     _horaVisitaCtrl.text = DateFormat('HH:mm').format(DateTime.now());
@@ -108,7 +125,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      locale: const Locale('pt', 'BR'), // Data em português
+      locale: const Locale('pt', 'BR'),
       initialDate: now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 2),
@@ -127,7 +144,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       builder: (context, child) {
         return Localizations.override(
           context: context,
-          locale: const Locale('pt', 'BR'), // Hora em português
+          locale: const Locale('pt', 'BR'),
           child: child,
         );
       },
@@ -201,7 +218,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               const SizedBox(height: 16),
               Text('Dados Obrigatórios', style: titleStyle),
               const SizedBox(height: 8),
-              // Campos obrigatórios na ordem solicitada
               TextFormField(
                 controller: _nomeClienteCtrl,
                 decoration: _obterDecoracaoCampo('Nome do Cliente *',
@@ -232,7 +248,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               TextFormField(
                 controller: _estadoCtrl,
                 decoration: _obterDecoracaoCampo('Estado *',
-                    hint: 'Digite o estado (ex: SP, RJ...)'),
+                    hint: 'Digite o estado'),
                 validator: (v) =>
                     _validarCampoObrigatorio(v, field: 'Estado'),
               ),
@@ -251,6 +267,19 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                     hint: 'Digite o endereço completo'),
                 validator: (v) =>
                     _validarCampoObrigatorio(v, field: 'Endereço'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _bairroCtrl,
+                decoration: _obterDecoracaoCampo('Bairro',
+                    hint: 'Digite o bairro do cliente'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _cepCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [_cepFormatter],
+                decoration: _obterDecoracaoCampo('CEP', hint: 'Digite o CEP'),
               ),
               const SizedBox(height: 10),
               TextFormField(

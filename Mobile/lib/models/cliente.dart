@@ -6,6 +6,8 @@ class Cliente {
   final String estado;
   final String cidade;
   final String endereco;
+  final String? bairro;   // Novo campo
+  final String? cep;      // Novo campo
   final DateTime dataVisita;
   final String? nomeCliente;
   final String? telefone;
@@ -18,6 +20,8 @@ class Cliente {
     required this.cidade,
     required this.endereco,
     required this.dataVisita,
+    this.bairro,
+    this.cep,
     this.nomeCliente,
     this.telefone,
     this.observacoes,
@@ -31,6 +35,8 @@ class Cliente {
         'estado': estado,
         'cidade': cidade,
         'endereco': endereco,
+        'bairro': bairro,
+        'cep': cep,
         'dataVisita': dataVisita.toIso8601String(),
         'nomeCliente': nomeCliente,
         'telefone': telefone,
@@ -44,6 +50,8 @@ class Cliente {
         estado: json['estado'],
         cidade: json['cidade'],
         endereco: json['endereco'],
+        bairro: json['bairro'],
+        cep: json['cep'],
         dataVisita: DateTime.parse(json['dataVisita']),
         nomeCliente: json['nomeCliente'],
         telefone: json['telefone'],
@@ -59,6 +67,8 @@ class Cliente {
       estado: data['estado'] ?? '',
       cidade: data['cidade'] ?? '',
       endereco: data['endereco'] ?? '',
+      bairro: data['bairro'],
+      cep: data['cep'],
       dataVisita: DateTime.tryParse(data['dataVisita'] ?? '') ?? DateTime.now(),
       nomeCliente: data['nomeCliente'],
       telefone: data['telefone'],

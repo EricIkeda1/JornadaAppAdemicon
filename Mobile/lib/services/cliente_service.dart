@@ -109,6 +109,8 @@ class ClienteService {
           estado: '',
           cidade: '',
           endereco: '',
+          bairro: null,
+          cep: null,    
           dataVisita: DateTime.now(),
         ));
       }
@@ -120,6 +122,8 @@ class ClienteService {
         estado: '',
         cidade: '',
         endereco: '',
+        bairro: null, 
+        cep: null,    
         dataVisita: DateTime.now(),
       ));
     }

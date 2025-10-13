@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
@@ -8,7 +8,9 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  static Future<FlutterLocalNotificationsPlugin> initialize() async {
+  static Future<FlutterLocalNotificationsPlugin?> initialize() async {
+    if (kIsWeb) return null;
+
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
     const AndroidInitializationSettings androidSettings = 
@@ -23,16 +25,18 @@ class NotificationService {
 
     await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-    if (Platform.isAndroid) {
+    try {
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
-    }
+    } catch (_) {}
 
     return flutterLocalNotificationsPlugin;
   }
 
   static Future<void> showSuccessNotification() async {
+    if (kIsWeb) return; 
+
     try {
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'channel_success',
@@ -54,6 +58,8 @@ class NotificationService {
   }
 
   static Future<void> showOfflineNotification() async {
+    if (kIsWeb) return; 
+
     try {
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'channel_offline',
@@ -66,7 +72,7 @@ class NotificationService {
       await flutterLocalNotificationsPlugin.show(
         DateTime.now().millisecondsSinceEpoch,
         'Cadastro temporário',
-        'Seus dados Cadastrados estão salvos no armazenamento temporariamente!',
+        'Seus dados cadastrados estão salvos temporariamente!',
         NotificationDetails(android: androidDetails),
       );
     } catch (e) {
