@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// Renomeado para MeusClientesTab já que está no arquivo meus_clientes_tab.dart
 class MeusClientesTab extends StatefulWidget {
   final Function onClienteRemovido;
 
@@ -324,7 +323,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
         onTap: () {
-          // Adicione ação de clique se necessário
         },
         child: Padding(
           padding: const EdgeInsets.all(16),

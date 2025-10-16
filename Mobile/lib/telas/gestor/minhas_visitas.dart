@@ -39,14 +39,12 @@ class _DashboardTabState extends State<DashboardTab> {
     setState(() => _isLoading = true);
 
     try {
-      // 🔹 Consultores ativos
       final consultoresRes = await _client
           .from('consultores')
           .select('id, nome, ativo')
           .eq('ativo', true)
           .order('nome');
 
-      // 🔹 Visitas dos próximos 30 dias
       final now = DateTime.now();
       final thirtyDays = now.add(const Duration(days: 30));
 
@@ -58,7 +56,6 @@ class _DashboardTabState extends State<DashboardTab> {
           .order('dataVisita')
           .limit(10);
 
-      // Cria mapa de consultores por ID para busca rápida
       final Map<String, String> consultorMap = {};
       if (consultoresRes is List) {
         for (var c in consultoresRes) {
@@ -180,7 +177,6 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 }
 
-// ====== MODELOS ======
 class _ConsultorStatus {
   final String nome;
   final String status;
@@ -203,7 +199,6 @@ class _VisitaProg {
   });
 }
 
-// ====== WIDGETS ======
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final String hint;

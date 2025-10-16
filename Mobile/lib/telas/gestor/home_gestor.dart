@@ -71,9 +71,8 @@ class _HomeGestorState extends State<HomeGestor> {
     final user = _client.auth.currentSession?.user;
     if (user == null || !mounted) return;
 
-    // CORREÇÃO: Tabela com "es"
     final consultoresFuture = _client
-        .from('consultores') // ✅ NOME CORRETO
+        .from('consultores')
         .select('id, nome')
         .eq('gestor_id', user.id)
         .order('nome')

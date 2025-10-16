@@ -45,7 +45,6 @@ class _HomeConsultorState extends State<HomeConsultor> {
     if (user == null || !mounted) return;
 
     try {
-      // Tabela correta: consultores
       final doc = await _client
           .from('consultores')
           .select('nome, email')

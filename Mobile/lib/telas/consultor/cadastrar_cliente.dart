@@ -95,7 +95,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     setState(() => _isLoading = true);
 
     try {
-      // Monta datetime a partir dos campos
       final dataStr = _dataVisitaCtrl.text;
       final horaStr = _horaVisitaCtrl.text;
       final dataHora = DateFormat('dd/MM/yyyy HH:mm').parse('$dataStr $horaStr');
@@ -108,7 +107,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         return;
       }
 
-      // Busca nome do consultor no Supabase
       String consultorNome = await _buscarNomeDoConsultor(user.id);
       if (consultorNome.trim().isEmpty) {
         consultorNome = user.email?.split('@').first ?? 'Consultor Desconhecido';

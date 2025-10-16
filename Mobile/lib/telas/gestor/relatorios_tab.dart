@@ -26,12 +26,11 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Busca consultores do gestor
-      // Correção: use 'gestor_id' (snake_case) em vez de 'gestorId'
+
       final consultores = await Supabase.instance.client
           .from('consultores')
           .select('id')
-          .eq('gestor_id', gestorId); // Correção: campo em snake_case
+          .eq('gestor_id', gestorId);
 
       setState(() {
         _consultoresIds.clear();
@@ -141,12 +140,10 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
         onRefresh: _carregarDados,
         child: CustomScrollView(
           slivers: [
-            // Header
             SliverToBoxAdapter(
               child: _buildHeader(),
             ),
 
-            // Conteúdo
             if (_isLoading)
               SliverToBoxAdapter(
                 child: _buildLoadingState(),
@@ -155,7 +152,6 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
               SliverToBoxAdapter(
                 child: Column(
                   children: [
-                    // Card de Desempenho dos Consultores
                     Card(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 2,
@@ -209,7 +205,6 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
                       ),
                     ),
 
-                    // Card de Atividade Recente
                     Card(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 2,
@@ -359,8 +354,7 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
 
     for (final consultorId in _consultoresIds) {
       try {
-        // Busca dados do consultor
-        // Correção: use 'nome' (snake_case) em vez de 'nome'
+
         final consultor = await Supabase.instance.client
             .from('consultores')
             .select('nome')
@@ -369,18 +363,16 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
 
         final nome = (consultor['nome'] as String?) ?? 'Sem nome';
 
-        // Busca clientes do consultor
-        // Correção: use 'consultor_uid' (snake_case) em vez de 'consultorUid'
+
         final clientes = await Supabase.instance.client
             .from('clientes')
             .select('*')
-            .eq('consultor_uid', consultorId); // Correção: campo em snake_case
+            .eq('consultor_uid', consultorId); 
 
         final List<dynamic> clientesList = clientes as List;
 
         int total = clientesList.length;
         int mes = clientesList.where((cliente) {
-          // Correção: use 'data_cadastro' (snake_case) em vez de 'dataCadastro'
           final dataCadastro = cliente['data_cadastro'] as String?;
           final DateTime? data = _parseData(dataCadastro);
           return data != null && data.isAfter(inicioMes);
@@ -470,16 +462,12 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
     final List<Widget> atividades = [];
 
     try {
-      // Busca clientes dos consultores do gestor, ordenados por data_cadastro
-      // Correções:
-      // 1. Use 'contains' no lugar de 'in_'
-      // 2. Use 'consultor_uid' (snake_case) em vez de 'consultorUid'
-      // 3. Use 'data_cadastro' (snake_case) em vez de 'dataCadastro'
+
       final clientes = await Supabase.instance.client
           .from('clientes')
           .select('*')
-          .contains('consultor_uid', _consultoresIds) // Correção: contains em vez de in_
-          .order('data_cadastro', ascending: false) // Correção: campo em snake_case
+          .contains('consultor_uid', _consultoresIds) 
+          .order('data_cadastro', ascending: false)
           .limit(10);
 
       final List<dynamic> clientesList = clientes as List;
@@ -487,7 +475,6 @@ class _RelatoriosTabState extends State<RelatoriosTab> {
       for (final cliente in clientesList) {
         final nomeCliente = (cliente['nome'] as String?) ?? 'Cliente';
         final bairro = (cliente['bairro'] as String?) ?? 'sem bairro';
-        // Correção: use 'data_cadastro' (snake_case) em vez de 'dataCadastro'
         final dataCadastro = cliente['data_cadastro'] as String?;
         final DateTime? data = _parseData(dataCadastro);
         final dataFormatada = data != null

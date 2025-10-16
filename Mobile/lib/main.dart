@@ -192,7 +192,6 @@ class UserTypeRedirector extends StatelessWidget {
           debugPrint('❌ Erro ao carregar tipo de usuário: ${snapshot.error}');
         }
 
-        // Todos os outros (consultor ou não encontrado) vão para HomeConsultor
         return const HomeConsultor();
       },
     );

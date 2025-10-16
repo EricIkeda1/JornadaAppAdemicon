@@ -30,7 +30,6 @@ class _TodosClientesTabState extends State<TodosClientesTab> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Busca consultores do gestor
       final consultores = await _consultorService.getConsultoresByGestor(gestorId);
       _consultoresDoGestor.clear();
       for (var c in consultores) {
@@ -38,10 +37,7 @@ class _TodosClientesTabState extends State<TodosClientesTab> {
         _expandedStates[c.nome] = false;
       }
 
-      // 2. Busca clientes dos consultores
       if (_consultoresDoGestor.isNotEmpty) {
-        // Correção: use 'contains' no lugar de 'in_'
-        // Correção: campos em snake_case (consultor_uid)
         final response = await Supabase.instance.client
             .from('clientes')
             .select('*')
@@ -181,12 +177,10 @@ class _TodosClientesTabState extends State<TodosClientesTab> {
         onRefresh: _loadClientes,
         child: CustomScrollView(
           slivers: [
-            // Header
             SliverToBoxAdapter(
               child: _buildHeader(),
             ),
 
-            // Conteúdo
             if (_isLoading)
               SliverToBoxAdapter(
                 child: _buildLoadingState(),

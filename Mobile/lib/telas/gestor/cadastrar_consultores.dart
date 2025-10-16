@@ -56,7 +56,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
       final email = _emailCtrl.text.trim();
       final senha = _senhaCtrl.text;
 
-      // Verifica se o e-mail é o mesmo do gestor
       final gestorDoc = await _client
           .from('gestor')
           .select('email')
@@ -72,7 +71,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
         }
       }
 
-      // Verifica se o e-mail já está cadastrado
       final consultorExistente = await _client
           .from('consultores')
           .select('id')
@@ -85,7 +83,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
         return;
       }
 
-      // ✅ Cria usuário no Supabase Auth com a sintaxe correta
       final response = await _client.auth.signUp(
         email: email,
         password: senha,
@@ -97,7 +94,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
 
       final userId = response.user!.id;
 
-      // Salva consultor na tabela
       await _client.from('consultores').insert({
         'nome': _nomeCtrl.text.trim(),
         'telefone': _telefoneCtrl.text,

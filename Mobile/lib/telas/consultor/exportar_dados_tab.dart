@@ -101,7 +101,6 @@ class ExportarDadosTab extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  // Botão de exportar desativado
                   child: FilledButton.icon(
                     onPressed: () {
                       _showSnack(context, 'Função de exportar desativada.');
@@ -115,7 +114,6 @@ class ExportarDadosTab extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  // Botão de copiar desativado
                   child: OutlinedButton.icon(
                     onPressed: () {
                       _showSnack(context, 'Função de copiar desativada.');
@@ -240,7 +238,6 @@ class ExportarDadosTab extends StatelessWidget {
     );
   }
 
-  // Exibe mensagem na tela (SnackBar)
   void _showSnack(BuildContext context, String message, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
