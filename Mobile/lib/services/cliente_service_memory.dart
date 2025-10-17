@@ -14,7 +14,6 @@ class ClienteServiceHybrid {
   final SupabaseClient _client = Supabase.instance.client;
   List<Cliente> _clientes = [];
 
-  // Keys for local storage
   static const String _cacheKey = 'clientes_cache';
   static const String _pendingKey = 'pending_ops';
   static const String _webStorageKey = 'clientes_data';
@@ -31,9 +30,7 @@ class ClienteServiceHybrid {
     ).length;
   }
 
-  // ---------------------- CARREGAR CLIENTES ----------------------
   Future<void> loadClientes() async {
-    // Tenta carregar do cache local (mobile)
     final prefs = await SharedPreferences.getInstance();
     final cachedData = prefs.getString(_cacheKey);
     if (cachedData != null) {
@@ -45,7 +42,6 @@ class ClienteServiceHybrid {
       }
     }
 
-    // Para web (localStorage)
     if (kIsWeb) {
       try {
         final stored = _getFromLocalStorageWeb();
@@ -58,7 +54,6 @@ class ClienteServiceHybrid {
       }
     }
 
-    // Se online, sincroniza com Supabase
     if (await _isOnline()) {
       try {
         final response = await _client
@@ -71,10 +66,8 @@ class ClienteServiceHybrid {
               .map((row) => Cliente.fromMap(row as Map<String, dynamic>))
               .toList();
           
-          // Merge com cache local apenas se Supabase retornar dados
           if (supabaseClientes.isNotEmpty) {
             _clientes = supabaseClientes;
-            // Salva cache local
             await _saveToCache();
             if (kIsWeb) _saveToLocalStorageWeb(jsonEncode(_clientes.map((c) => c.toJson()).toList()));
           }
@@ -85,17 +78,13 @@ class ClienteServiceHybrid {
     }
   }
 
-  // ---------------------- SALVAR CLIENTE ----------------------
   Future<void> saveCliente(Cliente cliente) async {
-    // Remove e adiciona cliente na lista local
     _clientes.removeWhere((c) => c.id == cliente.id);
     _clientes.add(cliente);
 
-    // Salva em cache local
     await _saveToCache();
     if (kIsWeb) _saveToLocalStorageWeb(jsonEncode(_clientes.map((c) => c.toJson()).toList()));
 
-    // Tenta salvar no Supabase se estiver online
     if (await _isOnline()) {
       try {
         final data = _clienteToMap(cliente);
@@ -104,7 +93,6 @@ class ClienteServiceHybrid {
             .upsert(data)
             .single();
         
-        // Remove da fila de pendentes após sucesso
         await _removePendingOperation('save', cliente.id);
       } catch (e) {
         if (kDebugMode) print('Erro ao salvar cliente no Supabase: $e');
@@ -115,9 +103,7 @@ class ClienteServiceHybrid {
     }
   }
 
-  // ---------------------- REMOVER CLIENTE ----------------------
   Future<void> removeCliente(String id) async {
-    // Busca cliente para salvar na operação pendente
     final cliente = _clientes.firstWhere((c) => c.id == id, orElse: () => Cliente(
       id: id,
       estabelecimento: '',
@@ -127,14 +113,11 @@ class ClienteServiceHybrid {
       dataVisita: DateTime.now(),
     ));
     
-    // Remove da lista local
     _clientes.removeWhere((c) => c.id == id);
 
-    // Salva cache atualizado
     await _saveToCache();
     if (kIsWeb) _saveToLocalStorageWeb(jsonEncode(_clientes.map((c) => c.toJson()).toList()));
 
-    // Tenta remover do Supabase se estiver online
     if (await _isOnline()) {
       try {
         await _client
@@ -143,7 +126,6 @@ class ClienteServiceHybrid {
             .eq('id', id)
             .execute();
         
-        // Remove da fila de pendentes após sucesso
         await _removePendingOperation('remove', id);
       } catch (e) {
         if (kDebugMode) print('Erro ao remover cliente do Supabase: $e');
@@ -154,7 +136,6 @@ class ClienteServiceHybrid {
     }
   }
 
-  // ---------------------- SINCRONIZAR OPERAÇÕES PENDENTES ----------------------
   Future<void> syncPendingOperations() async {
     if (!await _isOnline()) return;
 
@@ -169,7 +150,6 @@ class ClienteServiceHybrid {
     }
 
     try {
-      // Processa operações em batch
       for (var op in pendingOps) {
         final tipo = op['tipo'];
         final clienteMap = op['cliente'] as Map<String, dynamic>;
@@ -190,7 +170,6 @@ class ClienteServiceHybrid {
             if (kDebugMode) {
               print('❌ Falha ao sincronizar save: ${cliente.estabelecimento} - $e');
             }
-            // Continua com próximas operações
             continue;
           }
         } else if (tipo == 'remove') {
@@ -215,14 +194,11 @@ class ClienteServiceHybrid {
             if (kDebugMode) {
               print('❌ Falha ao sincronizar remove: ${cliente.id} - $e');
             }
-            // Continua com próximas operações
             continue;
           }
         }
       }
 
-      // Limpa fila após sync bem-sucedido
-      await prefs.remove(_pendingKey);
       if (kDebugMode) {
         print('✅ Fila de operações pendentes limpa!');
       }
@@ -233,7 +209,6 @@ class ClienteServiceHybrid {
     }
   }
 
-  // ---------------------- CACHE E OPERAÇÕES PENDENTES ----------------------
   Future<void> _saveToCache() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonData = jsonEncode(_clientes.map((c) => c.toJson()).toList());
@@ -245,7 +220,6 @@ class ClienteServiceHybrid {
     final data = prefs.getString(_pendingKey);
     List<dynamic> ops = data != null ? jsonDecode(data) : [];
     
-    // Evita duplicatas na fila
     ops.removeWhere((op) => 
       op['tipo'] == tipo && 
       op['cliente']['id'] == cliente.id
@@ -273,7 +247,6 @@ class ClienteServiceHybrid {
     final result = await Connectivity().checkConnectivity();
     if (result == ConnectivityResult.none) return false;
     
-    // Verificação extra para web
     if (kIsWeb) {
       try {
         final response = await _client.from('clientes').select('count()', count: CountOption.exact).execute();
@@ -286,7 +259,6 @@ class ClienteServiceHybrid {
     return true;
   }
 
-  // ---------------------- WEB LOCALSTORAGE ----------------------
   void _saveToLocalStorageWeb(String data) {
     try {
       js.context.callMethod('eval', ['localStorage.setItem("$_webStorageKey", "$data")']);
@@ -304,8 +276,6 @@ class ClienteServiceHybrid {
     }
   }
 
-  // ---------------------- SUPABASE MAPPING ----------------------
-  /// Converte Cliente para formato Supabase (snake_case)
   Map<String, dynamic> _clienteToMap(Cliente cliente) {
     return {
       'id': cliente.id,

@@ -4,6 +4,8 @@ import 'package:email_validator/email_validator.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:flutter/services.dart';
 
+const String SENHA_PADRAO = 'Ademicom@2025';
+
 class ConsultoresTab extends StatefulWidget {
   const ConsultoresTab({super.key});
 
@@ -16,7 +18,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
   final _nomeCtrl = TextEditingController();
   final _telefoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _senhaCtrl = TextEditingController();
   final _matriculaCtrl = TextEditingController();
 
   final _telefoneMask = MaskTextInputFormatter(
@@ -34,7 +35,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     _nomeCtrl.dispose();
     _telefoneCtrl.dispose();
     _emailCtrl.dispose();
-    _senhaCtrl.dispose();
     _matriculaCtrl.dispose();
     super.dispose();
   }
@@ -54,7 +54,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
       }
 
       final email = _emailCtrl.text.trim();
-      final senha = _senhaCtrl.text;
 
       final gestorDoc = await _client
           .from('gestor')
@@ -85,14 +84,12 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
 
       final response = await _client.auth.signUp(
         email: email,
-        password: senha,
+        password: SENHA_PADRAO,
       );
 
-      if (response.session == null) {
-        throw Exception('Falha ao criar usuário. Verifique email/senha.');
-      }
-
-      final userId = response.user!.id;
+      final userId = response.user?.id ??
+          (await _getUserIdByEmail(email)) ??
+          (throw Exception('Não foi possível obter o ID do usuário.'));
 
       await _client.from('consultores').insert({
         'nome': _nomeCtrl.text.trim(),
@@ -105,8 +102,20 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
         'data_cadastro': DateTime.now().toIso8601String(),
       });
 
-      _mostrarSnack('Consultor cadastrado com sucesso!', cor: Colors.green);
-      _limparCampos();
+      final login = await _client.auth.signInWithPassword(
+        email: email,
+        password: SENHA_PADRAO,
+      );
+
+      if (login.session != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushNamedAndRemoveUntil(context, '/consultor', (route) => false);
+        });
+        _mostrarSnack('Consultor cadastrado e logado com sucesso!', cor: Colors.green);
+        _limparCampos();
+      } else {
+        (throw Exception('Falha ao fazer login automático.'));
+      }
     } on AuthException catch (e) {
       _mostrarSnack('Erro de autenticação: ${e.message}', cor: Colors.red);
     } catch (e) {
@@ -114,6 +123,15 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<String?> _getUserIdByEmail(String email) async {
+    final response = await _client
+        .from('auth.users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+    return response?['id'];
   }
 
   void _mostrarSnack(String mensagem, {required Color cor}) {
@@ -132,7 +150,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
     _nomeCtrl.clear();
     _telefoneCtrl.clear();
     _emailCtrl.clear();
-    _senhaCtrl.clear();
     _matriculaCtrl.clear();
     setState(() {});
   }
@@ -231,17 +248,6 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
-                          controller: _senhaCtrl,
-                          obscureText: true,
-                          decoration: _decoracaoCampo('Senha', hint: 'Mínimo 6 caracteres'),
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Informe a senha';
-                            if (v.length < 6) return 'Mínimo 6 caracteres';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
                           controller: _matriculaCtrl,
                           decoration: _decoracaoCampo('Matrícula', hint: 'Número de matrícula', obrigatorio: false),
                           keyboardType: TextInputType.number,
@@ -266,7 +272,7 @@ class _ConsultoresTabState extends State<ConsultoresTab> {
                                         height: 20,
                                         child: CircularProgressIndicator(strokeWidth: 2),
                                       )
-                                    : const Text('Cadastrar Consultor'),
+                                    : const Text('Cadastrar e Entrar'),
                               ),
                             ),
                           ],

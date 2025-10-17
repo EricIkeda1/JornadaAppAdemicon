@@ -11,7 +11,7 @@ class Cliente {
   final String? telefone;
   final String? observacoes;
   final String? consultorResponsavel;
-  final String consultorUid; // adicionado campo obrigatório
+  final String consultorUid; 
 
   Cliente({
     required this.estabelecimento,
@@ -37,12 +37,12 @@ class Cliente {
         'endereco': endereco,
         'bairro': bairro,
         'cep': cep,
-        'data_visita': dataVisita.toIso8601String(),  // snake_case for Supabase
-        'nome_cliente': nomeCliente,                  // snake_case for Supabase
+        'data_visita': dataVisita.toIso8601String(),  
+        'nome_cliente': nomeCliente,                  
         'telefone': telefone,
         'observacoes': observacoes,
         'consultor_responsavel': consultorResponsavel,
-        'consultor_uid': consultorUid,                // snake_case for Supabase
+        'consultor_uid': consultorUid,                
       };
 
   factory Cliente.fromJson(Map<String, dynamic> json) => Cliente(
@@ -61,7 +61,6 @@ class Cliente {
         consultorUid: json['consultor_uid'] ?? json['consultorUid'] ?? 'desconhecido',
       );
 
-  // New factory for Supabase - uses snake_case field names
   factory Cliente.fromMap(Map<String, dynamic> map) {
     return Cliente(
       id: map['id'],
@@ -82,7 +81,6 @@ class Cliente {
     );
   }
 
-  // toMap for database operations (snake_case)
   Map<String, dynamic> toMap() {
     return {
       'id': id,

@@ -11,7 +11,6 @@ import 'telas/recuperar_senha.dart';
 import 'services/notification_service.dart';
 import 'services/cliente_service.dart';
 
-// Serviço de notificações
 FlutterLocalNotificationsPlugin? flutterLocalNotificationsPlugin;
 ClienteService? clienteService;
 
@@ -28,7 +27,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('✅ Iniciando app: WidgetsBinding OK');
 
-  // Inicializa notificações locais
   if (!kIsWeb) {
     try {
       flutterLocalNotificationsPlugin = await NotificationService.initialize();
@@ -38,16 +36,14 @@ void main() async {
     }
   }
 
-  // Carrega as variáveis de ambiente
   await loadEnv();
 
-  // Inicializa o Supabase
   final supabaseUrl = dotenv.get('SUPABASE_URL');
   final supabaseAnonKey = dotenv.get('SUPABASE_ANON_KEY');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     debugPrint('❌ URL ou chave do Supabase não encontradas no .env');
-    runApp(const ErrorScreen(error: 'Configuração do Supabase incorreta.'));
+    runApp(const ErrorScreen(error: 'Configuração do Supabase incorreta.\nVerifique o arquivo .env.'));
     return;
   }
 
@@ -60,8 +56,16 @@ void main() async {
   } catch (e, s) {
     debugPrint('❌ Falha ao inicializar Supabase: $e');
     debugPrint('❌ Stack trace: $s');
-    runApp(const ErrorScreen(error: 'Erro ao conectar ao banco de dados.'));
+    runApp(const ErrorScreen(error: 'Erro ao conectar ao banco de dados.\nVerifique sua conexão com a internet.'));
     return;
+  }
+
+  try {
+    clienteService = ClienteService();
+    await clienteService!.initialize();
+    debugPrint('✅ ClienteService inicializado.');
+  } catch (e) {
+    debugPrint('⚠️ Falha ao inicializar ClienteService: $e');
   }
 
   runApp(const MyApp());
@@ -75,18 +79,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    // Inicializa o serviço de clientes após o app iniciar
-    clienteService = ClienteService();
-    clienteService!.initialize().then((_) {
-      debugPrint('✅ ClienteService inicializado.');
-    }).catchError((e) {
-      debugPrint('⚠️ Falha ao inicializar ClienteService: $e');
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = ThemeData(
@@ -158,13 +150,30 @@ class UserTypeRedirector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final client = Supabase.instance.client;
+    final userId = client.auth.currentSession?.user?.id; 
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.warning, color: Colors.orange, size: 60),
+              SizedBox(height: 16),
+              Text('Sessão inválida', style: TextStyle(fontSize: 18)),
+              SizedBox(height: 8),
+              Text('Faça login novamente'),
+            ],
+          ),
+        ),
+      );
+    }
 
     return FutureBuilder(
       future: client
           .from('gestor')
-          .select('tipo')
-          .eq('id', client.auth.currentSession!.user.id)
-          .single(),
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -181,18 +190,27 @@ class UserTypeRedirector extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
-          final data = snapshot.data as Map<String, dynamic>;
-          final tipo = data['tipo'] as String?;
-
-          if (tipo == 'gestor') {
-            return const HomeGestor();
-          }
-        } else if (snapshot.hasError) {
-          debugPrint('❌ Erro ao carregar tipo de usuário: ${snapshot.error}');
+        if (snapshot.hasError) {
+          debugPrint('❌ Erro ao carregar tipo: ${snapshot.error}');
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_off, color: Colors.red, size: 60),
+                  SizedBox(height: 16),
+                  Text('Erro de conexão', style: TextStyle(fontSize: 18)),
+                  SizedBox(height: 8),
+                  Text('Verifique sua internet'),
+                ],
+              ),
+            ),
+          );
         }
 
-        return const HomeConsultor();
+        return snapshot.hasData && snapshot.data != null
+            ? const HomeGestor()
+            : const HomeConsultor();
       },
     );
   }

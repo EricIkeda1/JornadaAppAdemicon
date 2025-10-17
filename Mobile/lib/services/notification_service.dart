@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-// Remove 'late' declaration - moved to after initialization
 FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 class NotificationService {
@@ -17,7 +16,6 @@ class NotificationService {
     const AndroidInitializationSettings androidSettings = 
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
-    // Fixed: Removed onDidReceiveLocalNotification
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -31,7 +29,6 @@ class NotificationService {
     );
 
     try {
-      // CORREÇÃO: Método initialize não retorna mais bool
       await flutterLocalNotificationsPlugin.initialize(initSettings);
 
       if (!kIsWeb) {
@@ -41,9 +38,7 @@ class NotificationService {
                   .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
           
           if (androidImpl != null) {
-            // CORREÇÃO DEFINITIVA: O método requestPermission() foi removido.
-            // As permissões são gerenciadas automaticamente pelo sistema.
-            // Remova completamente esta chamada.
+
             debugPrint('NotificationService: Android permissions handled by system');
           }
         } catch (e) {
@@ -60,7 +55,6 @@ class NotificationService {
     }
   }
 
-  // Fixed: Proper const constructor usage
   static const AndroidNotificationDetails _androidSuccessDetails = 
       AndroidNotificationDetails(
     'channel_success',

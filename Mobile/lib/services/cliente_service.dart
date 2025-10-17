@@ -108,7 +108,6 @@ class ClienteService {
       if (isConnected) {
         final data = _clienteToMap(clienteComUid);
         
-        // CORREÇÃO FINAL: Removido completamente .execute()
         final response = await _client
             .from('clientes')
             .upsert(data);
@@ -140,7 +139,6 @@ class ClienteService {
 
     try {
       if (isConnected) {
-        // CORREÇÃO FINAL: Removido completamente .execute()
         await _client
             .from('clientes')
             .delete()
@@ -194,14 +192,12 @@ class ClienteService {
       try {
         if (tipo == 'save') {
           final data = _clienteToMap(cliente);
-          // CORREÇÃO FINAL: Removido completamente .execute()
           await _client
               .from('clientes')
               .upsert(data);
           
           print('✅ Enviado para Supabase: ${cliente.estabelecimento}');
         } else if (tipo == 'remove') {
-          // CORREÇÃO FINAL: Removido completamente .execute()
           await _client
               .from('clientes')
               .delete()

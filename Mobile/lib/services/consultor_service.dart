@@ -23,7 +23,7 @@ class ConsultorService {
   Future<List<Consultor>> getConsultoresByGestor(String gestorUid) async {
     try {
       final response = await _client
-          .from('consultor')
+          .from('consultores')
           .select('id, nome')
           .eq('gestor_id', gestorUid)
           .order('nome');
@@ -41,7 +41,7 @@ class ConsultorService {
   /// 🔹 Stream em tempo real de consultores (novo formato Supabase)
   Stream<List<Consultor>> getConsultoresStreamByGestor(String gestorUid) {
     return _client
-        .from('consultor')
+        .from('consultores')
         .stream(primaryKey: ['id']) // ✅ método atualizado
         .eq('gestor_id', gestorUid)
         .order('nome')
@@ -61,7 +61,7 @@ class ConsultorService {
   }) async {
     try {
       final response = await _client
-          .from('consultor')
+          .from('consultores')
           .insert({
             'nome': nome,
             'gestor_id': gestorId,
@@ -84,7 +84,7 @@ class ConsultorService {
   Future<void> updateConsultor(Consultor consultor) async {
     try {
       await _client
-          .from('consultor')
+          .from('consultores')
           .update({'nome': consultor.nome})
           .eq('id', consultor.uid);
     } catch (e) {
@@ -96,7 +96,7 @@ class ConsultorService {
   /// 🔹 Exclui consultor
   Future<void> deleteConsultor(String consultorUid) async {
     try {
-      await _client.from('consultor').delete().eq('id', consultorUid);
+      await _client.from('consultores').delete().eq('id', consultorUid);
     } catch (e) {
       print('❌ Erro ao excluir consultor: $e');
       rethrow;
@@ -107,7 +107,7 @@ class ConsultorService {
   Future<List<Consultor>> searchConsultores(String query, String gestorUid) async {
     try {
       final response = await _client
-          .from('consultor')
+          .from('consultores')
           .select('id, nome')
           .eq('gestor_id', gestorUid)
           .ilike('nome', '%$query%')

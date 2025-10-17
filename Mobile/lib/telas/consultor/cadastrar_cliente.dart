@@ -84,48 +84,52 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         if (email.isNotEmpty) return email.split('@').first;
       }
     } catch (e) {
-      debugPrint('Erro ao buscar nome do consultor no Supabase: $e');
+      debugPrint('Erro ao buscar nome do consultor: $e');
     }
-    return '';
+    return 'Desconhecido';
   }
 
   Future<void> _salvarCliente() async {
     if (_formKey.currentState?.validate() != true) return;
-
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
 
     try {
-      final dataStr = _dataVisitaCtrl.text;
-      final horaStr = _horaVisitaCtrl.text;
-      final dataHora = DateFormat('dd/MM/yyyy HH:mm').parse('$dataStr $horaStr');
+      final dataStr = _dataVisitaCtrl.text.trim();
+      final horaStr = _horaVisitaCtrl.text.trim();
 
-      final user = _client.auth.currentSession?.user;
-      if (user == null) {
+      DateTime dataHora;
+      try {
+        dataHora = DateFormat('dd/MM/yyyy HH:mm').parse('$dataStr $horaStr');
+      } on FormatException {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuário não autenticado.')),
+          const SnackBar(content: Text('Data ou hora inválida. Use o formato correto.')),
         );
         return;
       }
 
-      String consultorNome = await _buscarNomeDoConsultor(user.id);
-      if (consultorNome.trim().isEmpty) {
-        consultorNome = user.email?.split('@').first ?? 'Consultor Desconhecido';
+      final user = _client.auth.currentSession?.user;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro: sessão expirada. Faça login novamente.')),
+          );
+        }
+        return;
       }
 
+      String consultorNome = await _buscarNomeDoConsultor(user.id);
       final cliente = Cliente(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        nomeCliente: _nomeClienteCtrl.text.trim(),
-        telefone: _telefoneCtrl.text.trim(),
+        nomeCliente: _nomeClienteCtrl.text.trim().isEmpty ? null : _nomeClienteCtrl.text.trim(),
+        telefone: _telefoneCtrl.text.replaceAll(RegExp(r'[^\d]'), ''),
         estabelecimento: _nomeEstabelecimentoCtrl.text.trim(),
         estado: _estadoCtrl.text.trim(),
         cidade: _cidadeCtrl.text.trim(),
         endereco: _enderecoCtrl.text.trim(),
         bairro: _bairroCtrl.text.trim().isEmpty ? null : _bairroCtrl.text.trim(),
-        cep: _cepCtrl.text.trim().isEmpty ? null : _cepCtrl.text.trim(),
+        cep: _cepCtrl.text.replaceAll('-', ''),
         dataVisita: dataHora,
-        observacoes: _observacoesCtrl.text.trim().isEmpty
-            ? null
-            : _observacoesCtrl.text.trim(),
+        observacoes: _observacoesCtrl.text.trim().isEmpty ? null : _observacoesCtrl.text.trim(),
         consultorResponsavel: consultorNome,
         consultorUid: user.id,
       );
@@ -136,11 +140,9 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         _limparCampos();
         widget.onClienteCadastrado?.call();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Cliente cadastrado com sucesso!'),
-            backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          const SnackBar(
+            content: Text('Cliente cadastrado com sucesso!'),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -149,10 +151,8 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao cadastrar cliente: $e'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            content: Text('Erro ao salvar: ${e.toString().split('\n').first}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -186,7 +186,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       locale: const Locale('pt', 'BR'),
       initialDate: now,
       firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 2),
+      lastDate: DateTime(now.year + 1),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -204,15 +204,13 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     );
     if (picked != null) {
       _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
-      setState(() {});
     }
   }
 
   Future<void> _selecionarHora() async {
-    final now = TimeOfDay.now();
     final picked = await showTimePicker(
       context: context,
-      initialTime: now,
+      initialTime: TimeOfDay.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -233,20 +231,13 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       },
     );
     if (picked != null) {
-      final now = DateTime.now();
-      final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
-      _horaVisitaCtrl.text = DateFormat('HH:mm').format(dt);
-      setState(() {});
+      _horaVisitaCtrl.text = picked.format(context);
     }
   }
 
   String? _validarCampoObrigatorio(String? v, {String field = 'Campo'}) {
     if (v == null || v.trim().isEmpty) return '$field é obrigatório';
     return null;
-  }
-
-  String? _validarCampoOpcional(String? v) {
-    return null; 
   }
 
   InputDecoration _obterDecoracaoCampo(
@@ -261,39 +252,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       filled: true,
       fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 2,
-        ),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.error,
-          width: 2,
-        ),
-      ),
-      suffixIcon: suffixIcon,
-      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-      hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-          ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -310,7 +269,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              Icons.person_add_rounded,
+              Icons.add_business_rounded,
               color: Theme.of(context).colorScheme.onPrimaryContainer,
               size: 28,
             ),
@@ -322,48 +281,17 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
               children: [
                 Text(
                   'Cadastrar Cliente',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   'Preencha os dados do cliente',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, {String? subtitle}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
-        const SizedBox(height: 16),
-      ],
     );
   }
 
@@ -376,15 +304,11 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         },
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(
-              child: _buildHeader(),
-            ),
-
+            SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(
               child: Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 2,
                 margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Form(
@@ -392,19 +316,16 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildSectionTitle(
+                        Text(
                           'Dados Obrigatórios',
-                          subtitle: 'Campos marcados com * são obrigatórios',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
+                        const SizedBox(height: 16),
 
                         TextFormField(
                           controller: _nomeClienteCtrl,
-                          decoration: _obterDecoracaoCampo(
-                            'Nome do Cliente',
-                            hint: 'Digite o nome completo do cliente',
-                          ),
-                          validator: (v) =>
-                              _validarCampoObrigatorio(v, field: 'Nome do Cliente'),
+                          decoration: _obterDecoracaoCampo('Nome do Cliente', hint: 'Nome completo'),
+                          validator: (v) => _validarCampoObrigatorio(v, field: 'Nome do cliente'),
                         ),
                         const SizedBox(height: 12),
 
@@ -412,51 +333,34 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                           controller: _telefoneCtrl,
                           keyboardType: TextInputType.phone,
                           inputFormatters: [_telefoneFormatter],
-                          decoration: _obterDecoracaoCampo(
-                            'Telefone',
-                            hint: '(00) 00000-0000',
-                          ),
-                          validator: (v) =>
-                              _validarCampoObrigatorio(v, field: 'Telefone'),
+                          decoration: _obterDecoracaoCampo('Telefone', hint: '(00) 00000-0000'),
+                          validator: (v) => _validarCampoObrigatorio(v, field: 'Telefone'),
                         ),
                         const SizedBox(height: 12),
 
                         TextFormField(
                           controller: _nomeEstabelecimentoCtrl,
-                          decoration: _obterDecoracaoCampo(
-                            'Nome do Estabelecimento',
-                            hint: 'Digite o nome do estabelecimento',
-                          ),
-                          validator: (v) => _validarCampoObrigatorio(
-                              v, field: 'Nome do Estabelecimento'),
+                          decoration: _obterDecoracaoCampo('Estabelecimento', hint: 'Nome do ponto de venda'),
+                          validator: (v) => _validarCampoObrigatorio(v, field: 'Estabelecimento'),
                         ),
                         const SizedBox(height: 12),
 
                         Row(
                           children: [
                             Expanded(
-                              flex: 2,
                               child: TextFormField(
                                 controller: _estadoCtrl,
-                                decoration: _obterDecoracaoCampo(
-                                  'Estado',
-                                  hint: 'UF',
-                                ),
-                                validator: (v) =>
-                                    _validarCampoObrigatorio(v, field: 'Estado'),
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: _obterDecoracaoCampo('Estado', hint: 'PR'),
+                                validator: (v) => _validarCampoObrigatorio(v, field: 'Estado'),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              flex: 3,
                               child: TextFormField(
                                 controller: _cidadeCtrl,
-                                decoration: _obterDecoracaoCampo(
-                                  'Cidade',
-                                  hint: 'Nome da cidade',
-                                ),
-                                validator: (v) =>
-                                    _validarCampoObrigatorio(v, field: 'Cidade'),
+                                decoration: _obterDecoracaoCampo('Cidade', hint: 'Londrina'),
+                                validator: (v) => _validarCampoObrigatorio(v, field: 'Cidade'),
                               ),
                             ),
                           ],
@@ -465,44 +369,24 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
                         TextFormField(
                           controller: _enderecoCtrl,
-                          decoration: _obterDecoracaoCampo(
-                            'Endereço',
-                            hint: 'Digite o endereço completo',
-                          ),
-                          validator: (v) =>
-                              _validarCampoObrigatorio(v, field: 'Endereço'),
+                          decoration: _obterDecoracaoCampo('Endereço', hint: 'Av. ex: 123'),
+                          validator: (v) => _validarCampoObrigatorio(v, field: 'Endereço'),
                         ),
                         const SizedBox(height: 12),
 
                         Row(
                           children: [
-                            Expanded(
-                              flex: 3,
-                              child: TextFormField(
-                                controller: _bairroCtrl,
-                                decoration: _obterDecoracaoCampo(
-                                  'Bairro',
-                                  hint: 'Bairro',
-                                  isObrigatorio: false, 
-                                ),
-                                validator: _validarCampoOpcional, 
-                              ),
-                            ),
+                            Expanded(flex: 3, child: TextFormField(
+                              controller: _bairroCtrl,
+                              decoration: _obterDecoracaoCampo('Bairro', hint: 'Jardim x', isObrigatorio: false),
+                            )),
                             const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: _cepCtrl,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [_cepFormatter],
-                                decoration: _obterDecoracaoCampo(
-                                  'CEP',
-                                  hint: '00000-000',
-                                  isObrigatorio: false, 
-                                ),
-                                validator: _validarCampoOpcional, 
-                              ),
-                            ),
+                            Expanded(flex: 2, child: TextFormField(
+                              controller: _cepCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [_cepFormatter],
+                              decoration: _obterDecoracaoCampo('CEP', hint: '00000-000', isObrigatorio: false),
+                            )),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -515,18 +399,14 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                                 readOnly: true,
                                 decoration: _obterDecoracaoCampo(
                                   'Data da Visita',
-                                  hint: 'dd/MM/yyyy',
+                                  hint: 'dd/mm/aaaa',
                                   suffixIcon: IconButton(
-                                    icon: Icon(
-                                      Icons.calendar_today_outlined,
-                                      color: Theme.of(context).colorScheme.primary,
-                                    ),
+                                    icon: const Icon(Icons.calendar_today_outlined),
                                     onPressed: _selecionarData,
                                   ),
                                 ),
-                                validator: (v) =>
-                                    _validarCampoObrigatorio(v, field: 'Data da Visita'),
                                 onTap: _selecionarData,
+                                validator: (v) => _validarCampoObrigatorio(v, field: 'Data da visita'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -535,40 +415,33 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                                 controller: _horaVisitaCtrl,
                                 readOnly: true,
                                 decoration: _obterDecoracaoCampo(
-                                  'Hora da Visita',
-                                  hint: 'HH:mm',
+                                  'Hora',
+                                  hint: '00:00',
                                   suffixIcon: IconButton(
-                                    icon: Icon(
-                                      Icons.access_time_rounded,
-                                      color: Theme.of(context).colorScheme.primary,
-                                    ),
+                                    icon: const Icon(Icons.access_time),
                                     onPressed: _selecionarHora,
                                   ),
                                 ),
-                                validator: (v) =>
-                                    _validarCampoObrigatorio(v, field: 'Hora da Visita'),
                                 onTap: _selecionarHora,
+                                validator: (v) => _validarCampoObrigatorio(v, field: 'Hora'),
                               ),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 24),
 
-                        _buildSectionTitle(
-                          'Dados Opcionais',
-                          subtitle: 'Preencha conforme necessário',
-                        ),
+                        Text('Observações', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
 
                         TextFormField(
                           controller: _observacoesCtrl,
-                          maxLines: 4,
-                          decoration: _obterDecoracaoCampo(
-                            'Observações',
-                            hint: 'Digite observações sobre a visita...',
-                            isObrigatorio: false,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'Ex: cliente solicitou entrega no horário da tarde',
+                            filled: true,
+                            fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          validator: _validarCampoOpcional,
                         ),
 
                         const SizedBox(height: 24),
@@ -577,52 +450,21 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  side: BorderSide(
-                                    color: Theme.of(context).colorScheme.outline,
-                                  ),
-                                ),
                                 onPressed: _limparCampos,
-                                child: Text(
-                                  'Limpar',
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurface,
-                                      ),
-                                ),
+                                child: const Text('Limpar'),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: FilledButton(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Theme.of(context).colorScheme.primary,
-                                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
                                 onPressed: _isLoading ? null : _salvarCliente,
                                 child: _isLoading
-                                    ? SizedBox(
-                                        height: 20,
+                                    ? const SizedBox(
                                         width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Theme.of(context).colorScheme.onPrimary,
-                                        ),
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
                                       )
-                                    : Text(
-                                        'Cadastrar',
-                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                              color: Theme.of(context).colorScheme.onPrimary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
+                                    : const Text('Cadastrar Cliente'),
                               ),
                             ),
                           ],
