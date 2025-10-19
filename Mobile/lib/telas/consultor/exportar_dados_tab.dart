@@ -1,5 +1,9 @@
-import 'dart:ui' as ui;
+import 'dart:convert'; // necessário para utf8
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/cliente.dart';
 
 class ExportarDadosTab extends StatelessWidget {
@@ -102,9 +106,22 @@ class ExportarDadosTab extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () {
-                      _showSnack(context, 'Função de exportar desativada.');
-                    },
+                    onPressed: clientes.isEmpty
+                        ? null
+                        : () async {
+                            try {
+                              final csv = _buildCsv(clientes);
+                              final path = await _saveCsvToTemp(csv);
+                              // Dica: defina o mimeType explicitamente para alguns apps
+                              await Share.shareXFiles(
+                                [XFile(path, mimeType: 'text/csv', name: 'clientes_export.csv')],
+                                text: 'Clientes exportados',
+                              );
+                              _showSnack(context, 'Arquivo CSV gerado e pronto para compartilhar.');
+                            } catch (e) {
+                              _showSnack(context, 'Falha ao exportar: $e', color: Colors.red);
+                            }
+                          },
                     icon: const Icon(Icons.download_rounded),
                     label: const Text('Baixar CSV'),
                     style: FilledButton.styleFrom(
@@ -115,9 +132,17 @@ class ExportarDadosTab extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      _showSnack(context, 'Função de copiar desativada.');
-                    },
+                    onPressed: clientes.isEmpty
+                        ? null
+                        : () async {
+                            try {
+                              final csv = _buildCsv(clientes);
+                              await Clipboard.setData(ClipboardData(text: csv));
+                              _showSnack(context, 'CSV copiado para a área de transferência.');
+                            } catch (e) {
+                              _showSnack(context, 'Falha ao copiar: $e', color: Colors.red);
+                            }
+                          },
                     icon: const Icon(Icons.copy_rounded),
                     label: const Text('Copiar'),
                     style: OutlinedButton.styleFrom(
@@ -158,30 +183,31 @@ class ExportarDadosTab extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.analytics_outlined,
-                    color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.analytics_outlined, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Resumo da Exportação',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Row(
               children: [
-                _buildStat(context,
-                    icon: Icons.people_alt_outlined,
-                    label: 'Clientes',
-                    value: clientes.length.toString(),
-                    color: Theme.of(context).colorScheme.primary),
-                _buildStat(context,
-                    icon: Icons.table_chart,
-                    label: 'Formato',
-                    value: 'CSV',
-                    color: Colors.green),
+                _buildStat(
+                  context,
+                  icon: Icons.people_alt_outlined,
+                  label: 'Clientes',
+                  value: clientes.length.toString(),
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                _buildStat(
+                  context,
+                  icon: Icons.table_chart,
+                  label: 'Formato',
+                  value: 'CSV',
+                  color: Colors.green,
+                ),
               ],
             ),
             if (clientes.isEmpty)
@@ -194,8 +220,7 @@ class ExportarDadosTab extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Nenhum cliente disponível para exportar.',
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 13),
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                       ),
                     ),
                   ],
@@ -207,11 +232,13 @@ class ExportarDadosTab extends StatelessWidget {
     );
   }
 
-  Widget _buildStat(BuildContext context,
-      {required IconData icon,
-      required String label,
-      required String value,
-      required Color color}) {
+  Widget _buildStat(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -220,11 +247,7 @@ class ExportarDadosTab extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           Text(
             label,
@@ -236,6 +259,74 @@ class ExportarDadosTab extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Gera CSV com cabeçalho e escaping básico (aspas duplas e vírgulas)
+  String _buildCsv(List<Cliente> dados) {
+    final headers = [
+      'id',
+      'nome',
+      'telefone',
+      'estabelecimento',
+      'estado',
+      'cidade',
+      'endereco',
+      'bairro',
+      'cep',
+      'data_visita',
+      'hora_visita',
+      'observacoes',
+      'responsavel',
+      'consultor_uid_t',
+    ];
+    final buffer = StringBuffer();
+    buffer.writeln(headers.join(','));
+
+    for (final c in dados) {
+      final row = [
+        c.id,
+        c.nomeCliente,
+        c.telefone,
+        c.estabelecimento,
+        c.estado,
+        c.cidade,
+        c.endereco,
+        c.bairro ?? '',
+        c.cep ?? '',
+        c.dataVisita.toIso8601String(),
+        c.horaVisita ?? '',
+        c.observacoes ?? '',
+        c.consultorResponsavel ?? '',
+        c.consultorUid,
+      ].map(_escapeCsv).join(',');
+      buffer.writeln(row);
+    }
+    return buffer.toString();
+  }
+
+  // Escapa vírgulas, quebras de linha e aspas conforme CSV: aspas dobradas e campo entre aspas
+  String _escapeCsv(String value) {
+    var v = value;
+    final needsQuote = v.contains(',') || v.contains('\n') || v.contains('"');
+    if (v.contains('"')) {
+      v = v.replaceAll('"', '""');
+    }
+    return needsQuote ? '"$v"' : v;
+  }
+
+  // Salva o CSV no diretório temporário e retorna o caminho
+  Future<String> _saveCsvToTemp(String csv) async {
+    final dir = await getTemporaryDirectory();
+    final safeName = 'clientes_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+    final file = File('${dir.path}/$safeName');
+
+    // Use o codec global utf8 (top-level constant da lib dart:convert)
+    await file.writeAsString(
+      csv,
+      encoding: utf8,
+      flush: true, // garante escrita no disco antes de compartilhar
+    );
+    return file.path;
   }
 
   void _showSnack(BuildContext context, String message, {Color? color}) {

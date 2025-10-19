@@ -1,292 +1,141 @@
-// lib/services/cliente_service.dart
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/cliente.dart';
-import 'notification_service.dart';
 
 class ClienteService {
+  // Singleton
+  ClienteService._internal();
+  static final ClienteService _singleton = ClienteService._internal();
+  factory ClienteService() => _singleton;
+  static ClienteService get instance => _singleton;
+
   final SupabaseClient _client = Supabase.instance.client;
-  List<Cliente> _clientes = [];
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  final List<Cliente> _clientes = [];
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   static const String _cacheKey = 'clientes_cache';
   static const String _pendingKey = 'pending_ops';
 
-  List<Cliente> get clientes => _clientes;
-  int get totalClientes => _clientes.length;
-
-  int get totalVisitasHoje {
-    final hoje = DateTime.now();
-    return _clientes
-        .where((c) =>
-            c.dataVisita.year == hoje.year &&
-            c.dataVisita.month == hoje.month &&
-            c.dataVisita.day == hoje.day)
-        .length;
-  }
+  List<Cliente> get clientes => List.unmodifiable(_clientes);
 
   Future<void> initialize() async {
-    await loadClientes();
-    _connectivitySubscription = Connectivity()
-        .onConnectivityChanged
-        .map((results) => results.isNotEmpty ? results.first : ConnectivityResult.none)
-        .listen((result) async {
-      if (result != ConnectivityResult.none) {
-        await syncPendingOperations();
-      }
+    await _loadFromCache();
+    await syncPendingOperations(); // drena no startup
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
+      final hasNet = results.any((r) => r != ConnectivityResult.none);
+      if (!hasNet) return;
+      await Future.delayed(const Duration(milliseconds: 800)); // debounce
+      await syncPendingOperations();
     });
   }
 
   void dispose() {
-    _connectivitySubscription?.cancel();
+    _connectivitySub?.cancel();
   }
 
-  Future<void> loadClientes() async {
+  Future<void> _loadFromCache() async {
     final prefs = await SharedPreferences.getInstance();
-    final cachedData = prefs.getString(_cacheKey);
-
-    if (cachedData != null) {
-      try {
-        final List<dynamic> jsonList = jsonDecode(cachedData);
-        final List<Cliente> carregados = jsonList.map((e) => Cliente.fromJson(e)).toList();
-
-        final user = _client.auth.currentSession?.user?.id;
-        if (user != null) {
-          _clientes = carregados.map((cliente) {
-            return Cliente(
-              id: cliente.id,
-              estabelecimento: cliente.estabelecimento,
-              estado: cliente.estado,
-              cidade: cliente.cidade,
-              endereco: cliente.endereco,
-              bairro: cliente.bairro,
-              cep: cliente.cep,
-              dataVisita: cliente.dataVisita,
-              // ✅ Novo campo: hora
-              horaVisita: cliente.horaVisita ?? '',
-              nomeCliente: cliente.nomeCliente,
-              telefone: cliente.telefone,
-              observacoes: cliente.observacoes,
-              consultorResponsavel: cliente.consultorResponsavel,
-              // ✅ Garante o consultor_uid mesmo se vazio
-              consultorUid: cliente.consultorUid.isNotEmpty ? cliente.consultorUid : user,
-            );
-          }).toList();
-        } else {
-          _clientes = carregados;
-        }
-      } catch (e) {
-        print('❌ Erro ao carregar cache: $e');
-      }
-    }
-  }
-
-  Future<bool> _hasRealInternet() async {
+    final raw = prefs.getString(_cacheKey);
+    if (raw == null) return;
     try {
-      final result = await Connectivity().checkConnectivity();
-      if (result == ConnectivityResult.none) {
-        print('❌ Sem conexão de rede');
-        return false;
-      }
-
-      print('📡 Testando conexão com Supabase...');
-
-      final response = await _client
-          .from('clientes')
-          .select('id')
-          .limit(1)
-          .timeout(const Duration(seconds: 10));
-
-      final temConexao = response is List;
-      print('✅ Conexão com Supabase: ${temConexao ? "OK" : "Falhou"}');
-      return temConexao;
-    } catch (e, st) {
-      print('❌ ERRO REAL ao testar internet: $e');
-      print('📝 Stack: $st');
-      return false;
-    }
-  }
-
-  Future<void> saveCliente(Cliente cliente) async {
-    final user = _client.auth.currentSession?.user?.id;
-    if (user == null) {
-      print('⚠️ Usuário não autenticado.');
-      return;
-    }
-
-    // ✅ Garantir o consultorUid e hora
-    final clienteComUid = Cliente(
-      id: cliente.id,
-      estabelecimento: cliente.estabelecimento,
-      estado: cliente.estado,
-      cidade: cliente.cidade,
-      endereco: cliente.endereco,
-      bairro: cliente.bairro,
-      cep: cliente.cep,
-      dataVisita: cliente.dataVisita,
-      horaVisita: cliente.horaVisita,
-      nomeCliente: cliente.nomeCliente,
-      telefone: cliente.telefone,
-      observacoes: cliente.observacoes,
-      consultorResponsavel: cliente.consultorResponsavel,
-      consultorUid: user,
-    );
-
-    _clientes.removeWhere((c) => c.id == cliente.id);
-    _clientes.add(clienteComUid);
-    await _saveToCache();
-
-    final isConnected = await _hasRealInternet();
-    print('🌐 Online? $isConnected');
-
-    try {
-      if (isConnected) {
-        final data = _clienteToMap(clienteComUid);
-        print('📊 Dados: $data');
-        await _client.from('clientes').upsert(data, onConflict: 'id');
-        print('✅ Cliente salvo no Supabase: ${clienteComUid.estabelecimento}');
-        await NotificationService.showSuccessNotification();
-      } else {
-        await _savePendingOperation('save', clienteComUid);
-        await NotificationService.showOfflineNotification();
-      }
-    } catch (e, st) {
-      print('❌ Falha ao salvar no Supabase: $e');
-      print('📜 Stack: $st');
-      await _savePendingOperation('save', clienteComUid);
-      await NotificationService.showOfflineNotification();
-    }
-  }
-
-  Future<void> removeCliente(String id) async {
-    final user = _client.auth.currentSession?.user?.id;
-    if (user == null) {
-      print('⚠️ Usuário não autenticado.');
-      return;
-    }
-
-    _clientes.removeWhere((c) => c.id == id);
-    await _saveToCache();
-
-    final isConnected = await _hasRealInternet();
-    print('🌐 Remover - Online? $isConnected');
-
-    try {
-      if (isConnected) {
-        await _client.from('clientes').delete().eq('id', id);
-        print('✅ Cliente removido do Supabase: $id');
-      } else {
-        await _savePendingOperation('remove', Cliente(
-          id: id,
-          estabelecimento: '',
-          estado: '',
-          cidade: '',
-          endereco: '',
-          bairro: null,
-          cep: null,
-          dataVisita: DateTime.now(),
-          // ✅ Necessário
-          horaVisita: null,
-          nomeCliente: '',
-          telefone: '',
-          consultorUid: user,
-        ));
-      }
-    } catch (e, st) {
-      print('❌ Falha ao remover do Supabase: $e\n$st');
-      await _savePendingOperation('remove', Cliente(
-        id: id,
-        estabelecimento: '',
-        estado: '',
-        cidade: '',
-        endereco: '',
-        bairro: null,
-        cep: null,
-        dataVisita: DateTime.now(),
-        horaVisita: null,
-        nomeCliente: '',
-        telefone: '',
-        consultorUid: user,
-      ));
-    }
-  }
-
-  Future<void> syncPendingOperations() async {
-    final isConnected = await _hasRealInternet();
-    if (!isConnected) {
-      print('📡 Sem internet para sincronizar');
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final pendingData = prefs.getString(_pendingKey);
-    if (pendingData == null) return;
-
-    final List<dynamic> pendingOps = jsonDecode(pendingData);
-    print('📤 Sincronizando ${pendingOps.length} operações pendentes...');
-
-    for (final op in pendingOps) {
-      final tipo = op['tipo'] as String;
-      final cliente = Cliente.fromJson(op['cliente']);
-
-      try {
-        if (tipo == 'save') {
-          final data = _clienteToMap(cliente);
-          await _client.from('clientes').upsert(data, onConflict: 'id');
-          print('✅ Sync: cliente salvo -> ${cliente.estabelecimento}');
-        } else if (tipo == 'remove') {
-          await _client.from('clientes').delete().eq('id', cliente.id);
-          print('✅ Sync: cliente removido -> ${cliente.id}');
-        }
-      } catch (e, st) {
-        print('❌ Falha ao sincronizar com Supabase: $e\n$st');
-        return;
-      }
-    }
-
-    await prefs.remove(_pendingKey);
-    print('✅ Fila de operações pendentes limpa!');
+      final List list = jsonDecode(raw);
+      _clientes
+        ..clear()
+        ..addAll(list.map((e) => Cliente.fromJson(e as Map<String, dynamic>)));
+    } catch (_) {}
   }
 
   Future<void> _saveToCache() async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonData = jsonEncode(_clientes.map((c) => c.toJson()).toList());
-    await prefs.setString(_cacheKey, jsonData);
+    final data = jsonEncode(_clientes.map((c) => c.toJson()).toList());
+    await prefs.setString(_cacheKey, data);
   }
 
-  Future<void> _savePendingOperation(String tipo, Cliente cliente) async {
+  Future<void> _enqueue(String tipo, Cliente c) async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_pendingKey);
-    final List<dynamic> ops = data != null ? jsonDecode(data) : [];
-
-    ops.add({'tipo': tipo, 'cliente': cliente.toJson()});
+    final raw = prefs.getString(_pendingKey);
+    final List ops = raw != null ? jsonDecode(raw) : [];
+    ops.add({'tipo': tipo, 'cliente': c.toJson()});
     await prefs.setString(_pendingKey, jsonEncode(ops));
-    print('📁 Operação $tipo salva na fila offline');
   }
 
-  // ✅ Corrigido: usa consultor_uid_t e inclui hora_visita
-  Map<String, dynamic> _clienteToMap(Cliente cliente) {
-    return {
-      'id': cliente.id,
-      'nome': cliente.nomeCliente,
-      'telefone': cliente.telefone,
-      'estabelecimento': cliente.estabelecimento,
-      'estado': cliente.estado,
-      'cidade': cliente.cidade,
-      'endereco': cliente.endereco,
-      'bairro': cliente.bairro,
-      'cep': cliente.cep,
-      'data_visita': cliente.dataVisita.toIso8601String(),
-      // ✅ Novo campo
-      'hora_visita': cliente.horaVisita,
-      'observacoes': cliente.observacoes,
-      // ✅ Corrigido: _t
-      'consultor_uid_t': cliente.consultorUid,
-      'responsavel': cliente.consultorResponsavel,
-    };
+  Future<void> saveCliente(Cliente c) async {
+    // Normaliza UID para satisfazer RLS (auth.uid() = consultor_uid_t)
+    final uid = _client.auth.currentSession?.user.id;
+    final payload = (uid != null && uid.isNotEmpty) ? c.copyWith(consultorUid: uid) : c;
+
+    // Cache local
+    _clientes.removeWhere((x) => x.id == payload.id);
+    _clientes.add(payload);
+    await _saveToCache();
+
+    // Tenta enviar agora; se falhar (rede/schema/RLS), enfileira
+    try {
+      await _client.from('clientes').upsert(payload.toSupabaseMap(), onConflict: 'id').select();
+      // print('Upsert imediato OK: ${payload.id}');
+    } catch (_) {
+      // print('Upsert imediato ERRO: $e');
+      await _enqueue('save', payload);
+    }
+  }
+
+  Future<void> removeCliente(String id) async {
+    _clientes.removeWhere((x) => x.id == id);
+    await _saveToCache();
+    try {
+      await _client.from('clientes').delete().eq('id', id);
+    } catch (_) {
+      final stub = Cliente(
+        id: id,
+        nomeCliente: '',
+        telefone: '',
+        estabelecimento: '',
+        estado: '',
+        cidade: '',
+        endereco: '',
+        dataVisita: DateTime.now(),
+        consultorUid: '',
+      );
+      await _enqueue('remove', stub);
+    }
+  }
+
+  Future<void> syncPendingOperations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_pendingKey);
+    if (raw == null) return;
+
+    final List ops = jsonDecode(raw);
+    if (ops.isEmpty) return;
+
+    final List remain = [];
+    for (final op in ops) {
+      final tipo = op['tipo'] as String;
+      final c = Cliente.fromJson(op['cliente'] as Map<String, dynamic>);
+      final uid = _client.auth.currentSession?.user.id;
+      final payload = (uid != null && uid.isNotEmpty) ? c.copyWith(consultorUid: uid) : c;
+
+      try {
+        if (tipo == 'save') {
+          await _client.from('clientes').upsert(payload.toSupabaseMap(), onConflict: 'id').select();
+          // print('Sync upsert OK: ${payload.id}');
+        } else if (tipo == 'remove') {
+          await _client.from('clientes').delete().eq('id', payload.id);
+          // print('Sync remove OK: ${payload.id}');
+        }
+      } catch (_) {
+        // print('Sync ERRO ($tipo ${payload.id}): $e');
+        remain.add(op);
+      }
+    }
+
+    if (remain.isEmpty) {
+      await prefs.remove(_pendingKey);
+    } else {
+      await prefs.setString(_pendingKey, jsonEncode(remain));
+    }
   }
 }

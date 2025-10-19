@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../widgets/custom_navbar.dart';
 import 'meus_clientes_tab.dart';
@@ -126,6 +126,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
     );
   }
 
+  // Stream utilizada no card "Rua de Trabalho - Hoje"
   Stream<List<Map<String, dynamic>>> _streamClientes() {
     final user = _client.auth.currentSession?.user;
     if (user == null) return const Stream<List<Map<String, dynamic>>>.empty();
@@ -134,7 +135,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
         .from('clientes')
         .select('id, estabelecimento, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t')
         .eq('consultor_uid_t', user.id)
-        .order('data_visita', ascending: true)
+        .order('data_visita', ascending: true)  // garante datas do passado -> futuro
+        .order('hora_visita', ascending: true)  // garante horas cedo -> tarde
         .asStream();
   }
 
@@ -223,24 +225,41 @@ class _HomeConsultorState extends State<HomeConsultor> {
         final now = DateTime.now();
         final hoje = DateTime(now.year, now.month, now.day);
 
-        Map<String, dynamic>? clienteHoje;
-
+        // Coleta todos os de HOJE
+        final todays = <Map<String, dynamic>>[];
         for (final data in lista) {
           final s = data['data_visita']?.toString();
           if (s == null || s.isEmpty) continue;
           try {
             final dt = DateTime.parse(s);
             final d = DateTime(dt.year, dt.month, dt.day);
-            if (d == hoje) {
-              clienteHoje = data;
-              break;
-            }
+            if (d == hoje) todays.add(data);
           } catch (_) {}
         }
 
-        if (clienteHoje == null) {
+        if (todays.isEmpty) {
           return _buildRuaTrabalhoPlaceholder(cs, 'Nenhuma visita para hoje', 'As visitas de hoje aparecerão aqui');
         }
+
+        // Converte para DateTime completo para ordenar por horário
+        DateTime asDateTime(Map<String, dynamic> c) {
+          final s = c['data_visita']?.toString();
+          final h = c['hora_visita']?.toString();
+          DateTime base = DateTime.parse(s!).toLocal();
+          if (h != null && h.isNotEmpty) {
+            final p = h.split(':');
+            final hh = int.tryParse(p[0]) ?? 0;
+            final mm = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+            final ss = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
+            return DateTime(base.year, base.month, base.day, hh, mm, ss);
+          }
+          // Sem hora definida -> deixa no fim do dia
+          return DateTime(base.year, base.month, base.day, 23, 59, 59);
+        }
+
+        // Ordena por horário e escolhe o MAIS CEDO do dia
+        todays.sort((a, b) => asDateTime(a).compareTo(asDateTime(b)));
+        final clienteHoje = todays.first;
 
         final estabelecimento = (clienteHoje['estabelecimento'] as String?) ?? 'Estabelecimento';
         final endereco = (clienteHoje['endereco'] as String?) ?? 'Endereço';
@@ -404,7 +423,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
               nome: _userName,
               cargo: 'Consultor',
               tabsNoAppBar: false,
-              hideAvatar: true, 
+              hideAvatar: true,
             ),
           ),
         ),

@@ -37,8 +37,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
         .from('clientes')
         .select('*')
         .eq('consultor_uid_t', user.id)
-        .order('data_visita', ascending: false) 
-        .order('hora_visita', ascending: false) 
+        .order('data_visita', ascending: false)
+        .order('hora_visita', ascending: false)
         .asStream();
   }
 
@@ -440,16 +440,47 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
                 }
 
                 final clientes = snapshot.data!;
-                final clientesFiltrados = _query.isEmpty
+
+                // Busca
+                final filtrados = _query.isEmpty
                     ? clientes
-                    : clientes.where((cliente) {
-                        final estabelecimento = (cliente['estabelecimento']?.toString().toLowerCase() ?? '');
-                        final endereco = (cliente['endereco']?.toString().toLowerCase() ?? '');
-                        final query = _query.toLowerCase();
-                        return estabelecimento.contains(query) || endereco.contains(query);
+                    : clientes.where((c) {
+                        final estabelecimento = (c['estabelecimento']?.toString().toLowerCase() ?? '');
+                        final endereco = (c['endereco']?.toString().toLowerCase() ?? '');
+                        final q = _query.toLowerCase();
+                        return estabelecimento.contains(q) || endereco.contains(q);
                       }).toList();
 
-                if (clientesFiltrados.isEmpty) {
+                // Remove HOJE (para não duplicar com o destaque do Home)
+                final agora = DateTime.now();
+                final hojeIni = DateTime(agora.year, agora.month, agora.day, 0, 0, 0);
+                final hojeFim = DateTime(agora.year, agora.month, agora.day, 23, 59, 59);
+
+                bool isHoje(Map<String, dynamic> c) {
+                  final ds = c['data_visita']?.toString();
+                  if (ds == null || ds.isEmpty) return false;
+                  try {
+                    DateTime d = DateTime.parse(ds).toLocal();
+                    final hs = c['hora_visita']?.toString();
+                    if (hs != null && hs.isNotEmpty) {
+                      final p = hs.split(':');
+                      final h = int.tryParse(p[0]) ?? 0;
+                      final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+                      final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
+                      d = DateTime(d.year, d.month, d.day, h, m, s);
+                    } else {
+                      d = DateTime(d.year, d.month, d.day, 12, 0);
+                    }
+                    return (d.isAtSameMomentAs(hojeIni) || d.isAfter(hojeIni)) &&
+                           (d.isAtSameMomentAs(hojeFim) || d.isBefore(hojeFim));
+                  } catch (_) {
+                    return false;
+                  }
+                }
+
+                final semHoje = filtrados.where((c) => !isHoje(c)).toList();
+
+                if (semHoje.isEmpty) {
                   return _buildCard(
                     title: 'Próximas Visitas',
                     child: Container(
@@ -473,8 +504,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> {
                 }
 
                 return _buildCard(
-                  title: 'Próximas Visitas (${clientesFiltrados.length})',
-                  child: Column(children: clientesFiltrados.map((cliente) => _buildVisitaItem(cliente)).toList()),
+                  title: 'Próximas Visitas (${semHoje.length})',
+                  child: Column(children: semHoje.map((c) => _buildVisitaItem(c)).toList()),
                 );
               },
             ),
