@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ademicon_app/models/cliente.dart';
 import 'package:ademicon_app/services/cliente_service.dart';
+import 'package:ademicon_app/services/notification_service.dart';
 
 class CadastrarCliente extends StatefulWidget {
   final Function()? onClienteCadastrado;
@@ -168,25 +169,13 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       widget.onClienteCadastrado?.call();
 
       if (persistedNow) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cliente enviado ao servidor com sucesso.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        await NotificationService.showSuccessNotification();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cliente registrado localmente. Sincronizará automaticamente quando online.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        await NotificationService.showOfflineNotification();
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
-      );
+      await NotificationService.showErrorNotification('Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

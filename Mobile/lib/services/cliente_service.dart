@@ -25,6 +25,10 @@ class ClienteService {
   bool _initialized = false;
   bool _syncRunning = false;
 
+  // Emite número de registros enviados após uma sincronização bem sucedida
+  final StreamController<int> _syncedCountController = StreamController<int>.broadcast();
+  Stream<int> get onSyncedCount => _syncedCountController.stream;
+
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
@@ -52,6 +56,7 @@ class ClienteService {
       final becameOnline = wasOffline && current != ConnectivityResult.none;
       if (!becameOnline) return;
 
+      // Debounce pequeno para estabilizar rede (captivo, DNS etc.)
       await Future.delayed(const Duration(milliseconds: 700));
 
       if (!await _hasRealInternet()) return;
@@ -65,6 +70,7 @@ class ClienteService {
 
   void dispose() {
     _connectivitySub?.cancel();
+    _syncedCountController.close();
   }
 
   Future<bool> _hasRealInternet() async {
@@ -194,6 +200,8 @@ class ClienteService {
     if (ops.isEmpty) return true;
 
     final List remain = [];
+    int enviadosAgora = 0;
+
     for (final op in ops) {
       try {
         final tipo = op['tipo'] as String;
@@ -206,8 +214,10 @@ class ClienteService {
               .from('clientes')
               .upsert(payload.toSupabaseMap(), onConflict: 'id')
               .select();
+          enviadosAgora++;
         } else if (tipo == 'remove') {
           await _client.from('clientes').delete().eq('id', payload.id);
+          enviadosAgora++; // conta como operação sincronizada
         }
       } catch (e) {
         remain.add(op);
@@ -217,12 +227,18 @@ class ClienteService {
 
     if (remain.isEmpty) {
       await prefs.remove(_pendingKey);
-      return true;
     } else {
       await prefs.setString(_pendingKey, jsonEncode(remain));
-      return false;
     }
+
+    // Emite quantidade enviada para quem escuta (UI, main, Workmanager)
+    if (enviadosAgora > 0) {
+      _syncedCountController.add(enviadosAgora);
+    }
+
+    return remain.isEmpty;
   }
 
+  // API pública para acionar sincronização com backoff
   Future<void> syncPendingOperations() => _syncWithRetry();
 }

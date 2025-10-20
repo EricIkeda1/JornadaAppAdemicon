@@ -13,9 +13,7 @@ class NotificationService {
 
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-    const AndroidInitializationSettings androidSettings = 
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -30,33 +28,21 @@ class NotificationService {
 
     try {
       await flutterLocalNotificationsPlugin.initialize(initSettings);
-
-      if (!kIsWeb) {
-        try {
-          final AndroidFlutterLocalNotificationsPlugin? androidImpl = 
-              flutterLocalNotificationsPlugin
-                  .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-          
-          if (androidImpl != null) {
-
-            debugPrint('NotificationService: Android permissions handled by system');
-          }
-        } catch (e) {
-          debugPrint('NotificationService: Platform-specific initialization: $e');
-        }
-      }
-
-      debugPrint('NotificationService: Initialized successfully');
       return flutterLocalNotificationsPlugin;
-
-    } catch (e, stack) {
-      debugPrint('NotificationService: Initialization error: $e\n$stack');
+    } catch (_) {
       return null;
     }
   }
 
-  static const AndroidNotificationDetails _androidSuccessDetails = 
-      AndroidNotificationDetails(
+  // Android 13+: solicitar permissão em runtime
+  static Future<void> requestAndroid13Permission() async {
+    if (kIsWeb) return;
+    final androidImpl = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.requestNotificationsPermission();
+  }
+
+  static const AndroidNotificationDetails _androidSuccessDetails = AndroidNotificationDetails(
     'channel_success',
     'Cadastro de Clientes',
     channelDescription: 'Notificações para cadastros enviados com sucesso',
@@ -64,8 +50,7 @@ class NotificationService {
     priority: Priority.high,
   );
 
-  static const AndroidNotificationDetails _androidOfflineDetails = 
-      AndroidNotificationDetails(
+  static const AndroidNotificationDetails _androidOfflineDetails = AndroidNotificationDetails(
     'channel_offline',
     'Dados temporários',
     channelDescription: 'Notificações para dados salvos localmente',
@@ -73,8 +58,7 @@ class NotificationService {
     priority: Priority.high,
   );
 
-  static const AndroidNotificationDetails _androidErrorDetails = 
-      AndroidNotificationDetails(
+  static const AndroidNotificationDetails _androidErrorDetails = AndroidNotificationDetails(
     'channel_error',
     'Erros de sincronização',
     channelDescription: 'Notificações para erros de conexão ou salvamento',
@@ -82,48 +66,33 @@ class NotificationService {
     priority: Priority.high,
   );
 
-  static Future<void> showSuccessNotification() async {
+  static Future<void> showSuccessNotification({String? title, String? body}) async {
     if (kIsWeb) return;
-
-    try {
-      await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch,
-        'Cadastro enviado',
-        'O seu cadastro foi enviado ao banco de dados com sucesso!',
-        NotificationDetails(android: _androidSuccessDetails),
-      );
-    } catch (e, stack) {
-      debugPrint('❌ Falha ao exibir notificação de sucesso: $e\n$stack');
-    }
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch,
+      title ?? 'Cadastro enviado',
+      body ?? 'O seu cadastro foi enviado ao banco de dados com sucesso!',
+      const NotificationDetails(android: _androidSuccessDetails),
+    );
   }
 
   static Future<void> showOfflineNotification() async {
     if (kIsWeb) return;
-
-    try {
-      await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch,
-        'Cadastro temporário',
-        'Seus dados cadastrados estão salvos temporariamente!',
-        NotificationDetails(android: _androidOfflineDetails),
-      );
-    } catch (e, stack) {
-      debugPrint('❌ Falha ao exibir notificação offline: $e\n$stack');
-    }
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch,
+      'Cadastro temporário',
+      'Seus dados cadastrados estão salvos temporariamente!',
+      const NotificationDetails(android: _androidOfflineDetails),
+    );
   }
 
-  static Future<void> showErrorNotification() async {
+  static Future<void> showErrorNotification([String? msg]) async {
     if (kIsWeb) return;
-
-    try {
-      await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch,
-        'Erro de sincronização',
-        'Falha ao enviar dados. Verifique sua conexão e tente novamente.',
-        NotificationDetails(android: _androidErrorDetails),
-      );
-    } catch (e, stack) {
-      debugPrint('❌ Falha ao exibir notificação de erro: $e\n$stack');
-    }
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch,
+      'Erro de sincronização',
+      msg ?? 'Falha ao enviar dados. Verifique sua conexão e tente novamente.',
+      const NotificationDetails(android: _androidErrorDetails),
+    );
   }
 }
