@@ -37,7 +37,8 @@ class _HomeGestorState extends State<HomeGestor> {
     if (user == null || !mounted) return;
 
     try {
-      final response = await _client.from('gestor').select('nome').eq('id', user.id).maybeSingle();
+      final response =
+          await _client.from('gestor').select('nome').eq('id', user.id).maybeSingle();
       String nomeFormatado = 'Gestor';
       if (response != null && response.containsKey('nome')) {
         final nomeCompleto = (response['nome'] as String?) ?? '';
@@ -52,7 +53,8 @@ class _HomeGestorState extends State<HomeGestor> {
         });
       }
     } catch (_) {
-      final fallback = _client.auth.currentSession?.user?.email?.split('@').first ?? 'Gestor';
+      final fallback =
+          _client.auth.currentSession?.user?.email?.split('@').first ?? 'Gestor';
       if (mounted) {
         setState(() {
           _userName = fallback;
@@ -135,7 +137,9 @@ class _HomeGestorState extends State<HomeGestor> {
     final inicioHoje = DateTime.utc(now.year, now.month, now.day);
     final inicioAmanha = inicioHoje.add(const Duration(days: 1));
     final inicioMes = DateTime.utc(now.year, now.month, 1);
-    final inicioProxMes = (now.month == 12) ? DateTime.utc(now.year + 1, 1, 1) : DateTime.utc(now.year, now.month + 1, 1);
+    final inicioProxMes = (now.month == 12)
+        ? DateTime.utc(now.year + 1, 1, 1)
+        : DateTime.utc(now.year, now.month + 1, 1);
     final inicioAno = DateTime.utc(now.year, 1, 1);
     final inicioProxAno = DateTime.utc(now.year + 1, 1, 1);
 
@@ -188,32 +192,53 @@ class _HomeGestorState extends State<HomeGestor> {
           },
           child: NestedScrollView(
             headerSliverBuilder: (context, inner) => [
-              SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(12), child: _buildStatsCardGrid())),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: _buildStatsCardGrid(),
+                ),
+              ),
+              // MENU com laterais reduzidas
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _TabsHeaderDelegate(
                   Container(
                     height: 56,
-                    color: const Color(0xFFdcddde),
                     alignment: Alignment.centerLeft,
-                    child: const TabBar(
-                      isScrollable: true,
-                      labelPadding: EdgeInsets.symmetric(horizontal: 12), 
-                      labelColor: Colors.black,
-                      unselectedLabelColor: Colors.black54,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                      indicator: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                    padding: const EdgeInsets.symmetric(horizontal: 4), // era 8
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFdcddde),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    clipBehavior: Clip.none,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        tabBarTheme: const TabBarThemeData(
+                          dividerColor: Colors.transparent,
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          labelPadding: EdgeInsets.symmetric(horizontal: 10), // era 12
+                          labelColor: Colors.black,
+                          unselectedLabelColor: Colors.black54,
+                        ),
                       ),
-                      tabs: [
-                        Tab(text: 'Visitas do Consultor'),
-                        Tab(text: 'Consultores'),
-                        Tab(text: 'Todos os Clientes'),
-                        Tab(text: 'Relatórios'),
-                      ],
+                      child: const TabBar(
+                        isScrollable: true,
+                        labelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        indicator: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.all(Radius.circular(20)),
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
+                        ),
+                        tabs: [
+                          Tab(text: 'Minhas Visitas'),
+                          Tab(text: 'Cadastrar Cliente'),
+                          Tab(text: 'Meus Clientes'),
+                          Tab(text: 'Exportar Dados'),
+                        ],
+                      ),
                     ),
                   ),
                   min: 56,
