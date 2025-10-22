@@ -4,7 +4,7 @@ import '../widgets/custom_navbar.dart';
 import 'widgets/stat_card.dart';
 import 'minhas_visitas.dart';
 import 'cadastrar_consultores.dart';
-import 'todos_consultores_tab.dart'; 
+import 'todos_consultores_tab.dart';
 import 'relatorios_tab.dart';
 
 class HomeGestor extends StatefulWidget {
@@ -245,12 +245,12 @@ class _HomeGestorState extends State<HomeGestor> {
                 ),
               ),
             ],
-            body: const TabBarView(
+            body: TabBarView(
               children: [
-                MinhasVisitasPage(),
-                ConsultoresTab(),
-                TodosConsultoresTab(), 
-                RelatoriosTab(),
+                const MinhasVisitasPage(),
+                const ConsultoresTab(),
+                const TodosConsultoresTab(),
+                RelatoriosTabGestor(),
               ],
             ),
           ),
