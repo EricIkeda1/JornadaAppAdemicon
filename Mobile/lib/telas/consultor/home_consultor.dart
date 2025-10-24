@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../widgets/custom_navbar.dart';
 import 'meus_clientes_tab.dart';
 import 'minhas_visitas_tab.dart';
@@ -47,29 +49,33 @@ class _HomeConsultorState extends State<HomeConsultor> {
     if (user == null || !mounted) return;
 
     try {
-      final doc = await _client.from('consultores').select('nome, email').eq('id', user.id).maybeSingle();
+      // 1) Tenta por id (uuid recomendado)
+      Map<String, dynamic>? doc = await _client
+          .from('consultores')
+          .select('id, uid, nome')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (doc != null) {
-        final nomeCompleto = (doc['nome'] as String?) ?? '';
-        if (nomeCompleto.isNotEmpty) {
-          if (mounted) setState(() => _userName = _formatarNome(nomeCompleto));
-          return;
-        }
-        final email = (doc['email'] as String?) ?? user.email ?? '';
-        if (email.isNotEmpty && mounted) {
-          setState(() => _userName = email.split('@').first);
-          return;
-        }
+      debugPrint('[perfil] uid=${user.id} -> by id: $doc');
+
+      // 2) Se não achou, tenta pela coluna uid (para schemas que usam uid)
+      if (doc == null) {
+        doc = await _client
+            .from('consultores')
+            .select('id, uid, nome')
+            .eq('uid', user.id)
+            .maybeSingle();
+        debugPrint('[perfil] uid=${user.id} -> by uid: $doc');
       }
 
-      final fallbackEmail = user.email ?? '';
-      if (fallbackEmail.isNotEmpty && mounted) {
-        setState(() => _userName = fallbackEmail.split('@').first);
-        return;
-      }
+      final nomeTabela = (doc?['nome'] as String?)?.trim() ?? '';
+      final nomeAuth = (user.userMetadata?['name'] as String?)?.trim() ?? '';
+      final nomeEscolhido =
+          nomeTabela.isNotEmpty ? nomeTabela : (nomeAuth.isNotEmpty ? nomeAuth : 'Consultor');
 
-      if (mounted) setState(() => _userName = 'Consultor');
-    } catch (_) {
+      if (mounted) setState(() => _userName = _formatarNome(nomeEscolhido));
+    } catch (e) {
+      debugPrint('[perfil] erro ao carregar nome: $e');
       if (mounted) setState(() => _userName = 'Consultor');
     }
   }
@@ -80,21 +86,25 @@ class _HomeConsultorState extends State<HomeConsultor> {
     final uid = user.id;
 
     final rows = await _client.from('clientes').select('*').eq('consultor_uid_t', uid);
-
-    final clientes = (rows as List).map((m) => Cliente.fromMap(m as Map<String, dynamic>)).toList();
+    final clientes =
+        (rows as List).map((m) => Cliente.fromMap(m as Map<String, dynamic>)).toList();
 
     final agora = DateTime.now();
     final hoje = DateTime(agora.year, agora.month, agora.day);
 
-    final visitasHoje = clientes.where((c) {
-      final d = c.dataVisita;
-      return d.year == hoje.year && d.month == hoje.month && d.day == hoje.day;
-    }).length;
+    final visitasHoje = clientes
+        .where((c) {
+          final d = c.dataVisita;
+          return d.year == hoje.year && d.month == hoje.month && d.day == hoje.day;
+        })
+        .length;
 
-    final alertas = clientes.where((c) {
-      final d = DateTime(c.dataVisita.year, c.dataVisita.month, c.dataVisita.day);
-      return d.isBefore(hoje);
-    }).length;
+    final alertas = clientes
+        .where((c) {
+          final d = DateTime(c.dataVisita.year, c.dataVisita.month, c.dataVisita.day);
+          return d.isBefore(hoje);
+        })
+        .length;
 
     final finalizados = alertas;
 
@@ -124,6 +134,51 @@ class _HomeConsultorState extends State<HomeConsultor> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _abrirNoGoogleMaps(String endereco) async {
+    final q = Uri.encodeComponent(endereco.trim());
+    final androidGeo = Uri.parse('geo:0,0?q=$q');
+    final androidWeb = Uri.parse('https://maps.google.com/?q=$q');
+    final iosGmm = Uri.parse('comgooglemaps://?q=$q');
+    final iosApple = Uri.parse('http://maps.apple.com/?q=$q');
+
+    try {
+      final platform = Theme.of(context).platform;
+
+      if (platform == TargetPlatform.android) {
+        if (await canLaunchUrl(androidGeo)) {
+          await launchUrl(androidGeo);
+          return;
+        }
+        if (await canLaunchUrl(androidWeb)) {
+          await launchUrl(androidWeb, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } else if (platform == TargetPlatform.iOS) {
+        if (await canLaunchUrl(iosGmm)) {
+          await launchUrl(iosGmm);
+          return;
+        }
+        if (await canLaunchUrl(iosApple)) {
+          await launchUrl(iosApple);
+          return;
+        }
+      }
+
+      final web = Uri.parse('https://www.google.com/maps/search/?api=1&query=$q');
+      final ok = await launchUrl(web, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível abrir o Maps'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao abrir o Maps: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Stream<List<Map<String, dynamic>>> _streamClientes() {
@@ -256,7 +311,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
         final tituloLinha = horaHHmm.isNotEmpty ? 'HOJE $horaHHmm - $estabelecimento' : 'HOJE - $estabelecimento';
 
         return GestureDetector(
-          onTap: () => _copiarEndereco(enderecoCompleto),
+          onTap: () => _abrirNoGoogleMaps(enderecoCompleto),
           child: _buildRuaTrabalhoReal(cs, tituloLinha, enderecoCompleto),
         );
       },
@@ -349,7 +404,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   Text(
-                    'Toque para copiar o endereço',
+                    'Toque para abrir no Maps',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -404,7 +459,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
               nome: _userName,
               cargo: 'Consultor',
               tabsNoAppBar: false,
-              hideAvatar: true, 
+              hideAvatar: true,
             ),
           ),
         ),
