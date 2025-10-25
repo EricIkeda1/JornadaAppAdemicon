@@ -3,6 +3,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+const _kBg = Color(0xFFF7F8FA);
+const _kCard = Colors.white;
+const _kBorder = Color(0xFFE6E8EC);
+const _kTitle = Color(0xFF0F172A);
+const _kText = Color(0xFF475569);
+const _kMuted = Color(0xFF94A3B8);
+const _kPrimary = Color(0xFF0B5EA8);
+const _kSuccess = Color(0xFF2E7D32);
+const _kInfo = Color(0xFF1565C0);
+const _kAccent = Color(0xFF4F46E5);
+
 class MinhasVisitasTab extends StatefulWidget {
   const MinhasVisitasTab({super.key});
 
@@ -126,7 +137,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       } else if (data.year == amanha.year && data.month == amanha.month && data.day == amanha.day) {
         return 'Amanhã às $horaExibida';
       } else {
-        final format = data.year == hoje.year ? 'EEE, d MMMM' : 'EEE, d MMMM y';
+        final format = data.year == hoje.year ? 'EEE, d MMM' : 'EEE, d MMM y';
         return '${_capitalize(DateFormat(format, "pt_BR").format(data))} às $horaExibida';
       }
     } catch (_) {
@@ -138,9 +149,9 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     if (dataVisitaStr == null || dataVisitaStr.isEmpty) {
       return {
         'icone': Icons.schedule_outlined,
-        'texto': 'AGENDADO',
-        'corFundo': const Color(0xFF10B981),
-        'corTexto': Colors.white
+        'texto': 'Agendado',
+        'corFundo': _kSuccess.withOpacity(.10),
+        'corTexto': _kSuccess,
       };
     }
     try {
@@ -164,31 +175,31 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       if (ehHoje) {
         return {
           'icone': Icons.flag_outlined,
-          'texto': 'HOJE',
-          'corFundo': const Color(0xFF0EA5E9),
-          'corTexto': Colors.white
+          'texto': 'Hoje',
+          'corFundo': _kInfo.withOpacity(.10),
+          'corTexto': _kInfo,
         };
       } else if (data.isBefore(hojeInicio)) {
         return {
           'icone': Icons.check_circle_outline,
-          'texto': 'REALIZADA',
-          'corFundo': const Color(0xFF6366F1),
-          'corTexto': Colors.white
+          'texto': 'Realizada',
+          'corFundo': _kText.withOpacity(.08),
+          'corTexto': _kText,
         };
       } else {
         return {
           'icone': Icons.schedule_outlined,
-          'texto': 'AGENDADO',
-          'corFundo': const Color(0xFF10B981),
-          'corTexto': Colors.white
+          'texto': 'Agendado',
+          'corFundo': _kSuccess.withOpacity(.10),
+          'corTexto': _kSuccess,
         };
       }
     } catch (_) {
       return {
         'icone': Icons.schedule_outlined,
-        'texto': 'AGENDADO',
-        'corFundo': const Color(0xFF10B981),
-        'corTexto': Colors.white
+        'texto': 'Agendado',
+        'corFundo': _kSuccess.withOpacity(.10),
+        'corTexto': _kSuccess,
       };
     }
   }
@@ -200,27 +211,24 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: Colors.grey[50],
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: const BorderSide(color: _kBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: const BorderSide(color: _kBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(
-          color: Color(0xFFFF0000),
-          width: 2.5,
-        ),
+        borderSide: const BorderSide(color: _kPrimary, width: 2),
       ),
       suffixIcon: _query.isEmpty
-          ? const Icon(Icons.search, color: Color(0xFF64748B))
+          ? const Icon(Icons.search, color: _kMuted, size: 20)
           : IconButton(
-              icon: const Icon(Icons.clear, color: Color(0xFF64748B)),
+              icon: const Icon(Icons.close, color: _kMuted, size: 20),
               onPressed: () {
                 _searchCtrl.clear();
                 setState(() {
@@ -230,26 +238,19 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                 });
               },
             ),
-      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+      labelStyle: const TextStyle(color: _kText, fontSize: 13, fontWeight: FontWeight.w500),
+      hintStyle: const TextStyle(color: _kMuted, fontSize: 13),
     );
   }
 
   Widget _cleanCard({required Widget child, EdgeInsets? padding, EdgeInsets? margin}) {
     return Container(
-      margin: margin ?? const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      padding: padding ?? const EdgeInsets.all(20),
+      margin: margin ?? const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _kCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
       ),
       child: child,
     );
@@ -257,23 +258,20 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0EA5E9), Color(0xFF0284C7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              border: Border.all(color: _kBorder),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.calendar_today_outlined, color: Colors.white, size: 24),
+            child: const Icon(Icons.calendar_today_outlined, color: _kPrimary, size: 20),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,18 +279,18 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                 Text(
                   'Minhas Visitas',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.5,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: _kTitle,
+                    letterSpacing: -0.2,
                   ),
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Gerencie sua agenda profissional',
+                  'Agenda e acompanhamento',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
+                    fontSize: 12.5,
+                    color: _kText,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -312,59 +310,51 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     if (visiveis.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: SizedBox(
-        height: 140,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final t in visiveis)
-                Material(
-                  color: _ruaSelecionada == t ? const Color(0xFF0EA5E9) : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: () {
-                      if (!mounted) return;
-                      setState(() {
-                        if (_ruaSelecionada != t) {
-                          _ruaSelecionada = t;
-                          _searchCtrl.text = t;
-                          _query = t;
-                          _showChips = false;
-                        } else {
-                          _ruaSelecionada = null;
-                          _searchCtrl.clear();
-                          _query = '';
-                        }
-                        _invalidateCaches();
-                      });
-                    },
+      padding: const EdgeInsets.only(top: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final t in visiveis)
+            Material(
+              color: _ruaSelecionada == t ? _kPrimary.withOpacity(.08) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () {
+                  if (!mounted) return;
+                  setState(() {
+                    if (_ruaSelecionada != t) {
+                      _ruaSelecionada = t;
+                      _searchCtrl.text = t;
+                      _query = t;
+                      _showChips = false;
+                    } else {
+                      _ruaSelecionada = null;
+                      _searchCtrl.clear();
+                      _query = '';
+                    }
+                    _invalidateCaches();
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _ruaSelecionada == t ? _kPrimary : _kBorder),
                     borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: _ruaSelecionada == t ? const Color(0xFF0EA5E9) : const Color(0xFFE2E8F0),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        t,
-                        style: TextStyle(
-                          color: _ruaSelecionada == t ? Colors.white : const Color(0xFF475569),
-                          fontSize: 13,
-                          fontWeight: _ruaSelecionada == t ? FontWeight.w600 : FontWeight.w500,
-                        ),
-                      ),
+                  ),
+                  child: Text(
+                    t,
+                    style: TextStyle(
+                      color: _ruaSelecionada == t ? _kPrimary : _kText,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -394,118 +384,113 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     ].where((e) => e.trim().isNotEmpty).join(', ');
 
     return _cleanCard(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      padding: const EdgeInsets.all(16),
-      child: Row(
+      padding: const EdgeInsets.all(14),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: (status['corFundo'] as Color).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              status['icone'] as IconData,
-              size: 20,
-              color: status['corFundo'] as Color,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  estabelecimento,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: _kTitle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (status['corFundo'] as Color),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: (status['corTexto'] as Color).withOpacity(.25),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: status['corFundo'] as Color,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        status['texto'] as String,
-                        style: TextStyle(
-                          color: status['corTexto'] as Color,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                    Icon(
+                      status['icone'] as IconData,
+                      size: 14,
+                      color: status['corTexto'] as Color,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        estabelecimento,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
+                    const SizedBox(width: 6),
+                    Text(
+                      status['texto'] as String,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: status['corTexto'] as Color,
                       ),
                     ),
                   ],
                 ),
-                if (enderecoCompleto.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          enderecoCompleto,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.access_time, size: 14, color: Color(0xFF64748B)),
-                    const SizedBox(width: 4),
-                    Text(
-                      dataFmt,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
-                      ),
+              ),
+            ],
+          ),
+          if (enderecoCompleto.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16, color: _kMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    enderecoCompleto,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: _kText,
+                      height: 1.4,
                     ),
-                    const Spacer(),
-                    if (enderecoCompleto.trim().length > 3)
-                      Material(
-                        color: const Color(0xFF0EA5E9),
-                        borderRadius: BorderRadius.circular(8),
-                        child: InkWell(
-                          onTap: () => _abrirNoGoogleMaps(enderecoCompleto),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: const Icon(
-                              Icons.map_outlined,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ],
             ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 16, color: _kMuted),
+              const SizedBox(width: 6),
+              Text(
+                dataFmt,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: _kTitle,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (enderecoCompleto.trim().length > 3)
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: _kPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: _kBorder),
+                    ),
+                  ),
+                  onPressed: () => _abrirNoGoogleMaps(enderecoCompleto),
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text(
+                    'Rota',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -532,7 +517,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       stream: _todasVisitasStream,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return _expansionSkeleton(title: 'Todas as visitas');
+          return _expansionSkeleton(title: 'Todas as Visitas');
         }
         if (snap.hasError) {
           return _errorBox('Erro: ${snap.error}');
@@ -560,10 +545,10 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
 
         final grupos = _cacheTodasAgrupado!;
         return _animatedExpansionCard(
-          title: 'Todas as visitas',
+          title: 'Todas as Visitas',
           subtitle: '${filtrados.length} registros',
           icon: Icons.groups_outlined,
-          iconColor: const Color(0xFF0EA5E9),
+          iconColor: _kAccent,
           expanded: _todosExpanded,
           onChanged: (v) => setState(() => _todosExpanded = v),
           child: _todosExpanded
@@ -575,15 +560,21 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _kBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _kBorder),
+                          ),
                           child: Row(
                             children: [
                               Container(
                                 width: 6,
                                 height: 6,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF0EA5E9),
+                                  color: _kAccent,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -591,24 +582,24 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                               Text(
                                 _abreviarUidComoNome(uid),
                                 style: const TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF475569),
+                                  color: _kTitle,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: _kAccent.withOpacity(.1),
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
                                   '${itens.length}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF64748B),
+                                    color: _kAccent,
                                   ),
                                 ),
                               ),
@@ -629,19 +620,24 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
   Widget _expansionSkeleton({required String title}) {
     return _cleanCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: _kTitle,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ...List.generate(
             2,
             (i) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              height: 80,
+              margin: const EdgeInsets.only(bottom: 10),
+              height: 72,
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: _kBg,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -657,30 +653,31 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       child: Column(
         children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
+              color: _kBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _kBorder),
             ),
-            child: Icon(icon, size: 32, color: const Color(0xFF94A3B8)),
+            child: Icon(icon, size: 28, color: _kMuted),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF0F172A),
+              color: _kTitle,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
+              fontSize: 13,
+              color: _kText,
               height: 1.5,
             ),
           ),
@@ -691,20 +688,24 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
 
   Widget _errorBox(String msg) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEE2E2),
+        color: const Color(0xFFFDECEC),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFEF4444)),
+        border: Border.all(color: const Color(0xFFE57373)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 20),
-          const SizedBox(width: 12),
+          const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               msg,
-              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+              style: const TextStyle(
+                color: Color(0xFFD32F2F),
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -736,7 +737,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: _kBg,
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () {
@@ -749,19 +750,19 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
             SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(
               child: _cleanCard(
-                margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Pesquisar',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
+                        color: _kTitle,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: _searchCtrl,
                       textInputAction: TextInputAction.search,
@@ -785,8 +786,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                     return Column(
                       children: [
                         _expansionSkeleton(title: 'Próximas Visitas'),
-                        _expansionSkeleton(title: 'Todas as visitas'),
-                        _expansionSkeleton(title: 'Finalizados'),
+                        _expansionSkeleton(title: 'Todas as Visitas'),
+                        _expansionSkeleton(title: 'Visitas Finalizadas'),
                       ],
                     );
                   }
@@ -845,7 +846,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                         title: 'Próximas Visitas',
                         subtitle: '$countProx agendadas',
                         icon: Icons.event_available_outlined,
-                        iconColor: const Color(0xFF10B981),
+                        iconColor: _kSuccess,
                         expanded: _proxExpanded,
                         onChanged: (v) => setState(() => _proxExpanded = v),
                         child: _proxExpanded
@@ -861,10 +862,10 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                       ),
                       _buildTodasVisitasSection(),
                       _animatedExpansionCard(
-                        title: 'Finalizados',
+                        title: 'Visitas Finalizadas',
                         subtitle: '$countFin concluídas',
                         icon: Icons.check_circle_outline,
-                        iconColor: const Color(0xFF6366F1),
+                        iconColor: _kText,
                         expanded: _finExpanded,
                         onChanged: (v) => setState(() => _finExpanded = v),
                         child: _finExpanded
@@ -926,7 +927,10 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
   void initState() {
     super.initState();
     _expandedLocal = widget.expanded;
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
     _turns = Tween<double>(begin: 0.0, end: 0.5).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
@@ -962,28 +966,21 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _kCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
       ),
       child: Column(
         children: [
           Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: _toggle,
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     if (widget.icon != null) ...[
@@ -991,13 +988,13 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: (widget.iconColor ?? const Color(0xFF0EA5E9)).withOpacity(0.1),
+                          color: (widget.iconColor ?? _kPrimary).withOpacity(.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           widget.icon,
                           size: 18,
-                          color: widget.iconColor ?? const Color(0xFF0EA5E9),
+                          color: widget.iconColor ?? _kPrimary,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1009,9 +1006,9 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
                           Text(
                             widget.title,
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: _kTitle,
                             ),
                           ),
                           if (widget.subtitle != null) ...[
@@ -1019,8 +1016,8 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
                             Text(
                               widget.subtitle!,
                               style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF64748B),
+                                fontSize: 12.5,
+                                color: _kText,
                               ),
                             ),
                           ],
@@ -1031,8 +1028,8 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
                       turns: _turns,
                       child: const Icon(
                         Icons.keyboard_arrow_down,
-                        color: Color(0xFF64748B),
-                        size: 24,
+                        color: _kMuted,
+                        size: 22,
                       ),
                     ),
                   ],
@@ -1045,7 +1042,9 @@ class _AnimatedSizeExpansionCardState extends State<_AnimatedSizeExpansionCard>
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: _expandedLocal ? const BoxConstraints() : const BoxConstraints(maxHeight: 0.0),
+              constraints: _expandedLocal
+                  ? const BoxConstraints()
+                  : const BoxConstraints(maxHeight: 0.0),
               child: widget.child,
             ),
           ),
