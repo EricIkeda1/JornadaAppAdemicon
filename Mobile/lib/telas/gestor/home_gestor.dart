@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../widgets/lead_card.dart' as widgets;
 import 'components/editar.dart' as comps;
 import 'components/gestor_navbar.dart';
 import 'components/gestor_header_row.dart';
 import 'components/menu_inferior.dart';
 
+import 'telas/lista_consultor.dart';
+import 'telas/nova_tela_branca.dart';
+
 class HomeGestor extends StatefulWidget {
   const HomeGestor({super.key});
-
   @override
   State<HomeGestor> createState() => _HomeGestorState();
 }
@@ -17,9 +20,17 @@ class _HomeGestorState extends State<HomeGestor> {
   static const Color branco = Color(0xFFFFFFFF);
   static const Color fundoApp = Color(0xFFF7F7F7);
   static const Color preto09 = Color(0xFF231F20);
+
   int _tab = 0;
   late final PageController _pageController = PageController(initialPage: _tab);
+
+  final GlobalKey<NavigatorState> _leadsNavKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _consultoresNavKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _enderecosNavKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _exportarNavKey = GlobalKey<NavigatorState>();
+
   final _sb = Supabase.instance.client;
+
   bool _loading = true;
   String? _erro;
   final List<Map<String, dynamic>> _leads = [];
@@ -56,15 +67,19 @@ class _HomeGestorState extends State<HomeGestor> {
       });
     }
     if (!_hasMore || _loadingMore) return;
+
     try {
       setState(() => _loadingMore = true);
+
       final start = _page * _pageSize;
       final end = start + _pageSize - 1;
+
       final rows = await _sb
           .from('clientes')
           .select('id, nome, endereco, bairro, telefone, data_visita, observacoes, consultor_uid_t')
           .order('data_visita', ascending: false, nullsFirst: true)
           .range(start, end);
+
       final batch = <Map<String, dynamic>>[];
       for (final r in rows) {
         final id = r['id'];
@@ -84,12 +99,8 @@ class _HomeGestorState extends State<HomeGestor> {
           'alerta': _isAlerta(r['data_visita']),
         });
       }
-      final uids = batch
-          .map((e) => e['consUid'])
-          .where((e) => e != null)
-          .toSet()
-          .cast<String>()
-          .toList();
+
+      final uids = batch.map((e) => e['consUid']).where((e) => e != null).toSet().cast<String>().toList();
       if (uids.isNotEmpty) {
         final consRows = await _sb.from('consultores').select('uid, nome').inFilter('uid', uids);
         final map = <String, String>{};
@@ -103,6 +114,7 @@ class _HomeGestorState extends State<HomeGestor> {
           e['cons'] = uid != null ? (map[uid] ?? '') : '';
         }
       }
+
       setState(() {
         _leads.addAll(batch);
         _page += 1;
@@ -144,6 +156,21 @@ class _HomeGestorState extends State<HomeGestor> {
 
   Future<void> _refresh() async => _carregarLeads(initial: true);
 
+  Future<bool> _onWillPop() async {
+    final currentKey = <GlobalKey<NavigatorState>>[
+      _leadsNavKey,
+      _consultoresNavKey,
+      _enderecosNavKey,
+      _exportarNavKey,
+    ][_tab];
+
+    if (currentKey.currentState?.canPop() == true) {
+      currentKey.currentState!.pop();
+      return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -155,123 +182,77 @@ class _HomeGestorState extends State<HomeGestor> {
           elevation: 0,
         ),
       ),
-      child: Scaffold(
-        appBar: const GestorNavbar(),
-        body: Column(
-          children: [
-            if (_tab == 0)
-              Container(
-                color: branco,
-                child: GestorHeaderRow(
-                  total: _ids.length,
-                  onAvisos: () {},
+      child: WillPopScope(
+        onWillPop: _onWillPop,
+        child: Scaffold(
+          appBar: const GestorNavbar(),
+          body: Column(
+            children: [
+              if (_tab == 0)
+                Container(
+                  color: branco,
+                  child: GestorHeaderRow(
+                    total: _ids.length,
+                    onAvisos: () {},
+                  ),
+                ),
+              if (_tab == 0) const SizedBox(height: 6),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _tab = i),
+                  children: [
+                    _LeadsTab(
+                      loading: _loading,
+                      erro: _erro,
+                      leads: _leads,
+                      idsCount: _ids.length,
+                      hasMore: _hasMore,
+                      loadingMore: _loadingMore,
+                      expandirTodos: _expandirTodos,
+                      onRefresh: _refresh,
+                      onCarregarMais: _carregarLeads,
+                      onEditar: _abrirEditar,
+                      onTransferir: _abrirTransferir,
+                      setExpandirTodos: (v) => setState(() => _expandirTodos = v),
+                    ),
+                    Navigator(
+                      key: _consultoresNavKey,
+                      onGenerateRoute: (settings) {
+                        return MaterialPageRoute(
+                          builder: (_) => ConsultoresRoot(
+                              onCadastrar: () {}), 
+                        );
+                      },
+                    ),
+                    Navigator(
+                      key: _enderecosNavKey,
+                      onGenerateRoute: (_) =>
+                          MaterialPageRoute(builder: (_) => const Center(child: Text('Endereços'))),
+                    ),
+                    Navigator(
+                      key: _exportarNavKey,
+                      onGenerateRoute: (_) =>
+                          MaterialPageRoute(builder: (_) => const Center(child: Text('Exportar'))),
+                    ),
+                  ],
                 ),
               ),
-            if (_tab == 0) const SizedBox(height: 6),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) => setState(() => _tab = i),
-                children: [
-                  _tabLeads(),
-                  const Center(child: Text('Consultores')),
-                  const Center(child: Text('Endereços')),
-                  const Center(child: Text('Exportar')),
-                ],
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: MenuInferior(
-          index: _tab,
-          controller: _pageController,
-          onChanged: (i) {
-            _pageController.animateToPage(
-              i,
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _tabLeads() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_erro != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_erro!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: _refresh, child: const Text('Tentar novamente')),
-          ],
-        ),
-      );
-    }
-    final total = _ids.length;
-    final mostrarLimite = !_expandirTodos && total > 10;
-    final itemCount = mostrarLimite ? 11 : _leads.length;
-    return RefreshIndicator(
-      onRefresh: () async {
-        _expandirTodos = false;
-        await _refresh();
-      },
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (n) {
-          if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200 &&
-              !_loading &&
-              _hasMore &&
-              !_loadingMore) {
-            _carregarLeads();
-          }
-          return false;
-        },
-        child: ListView.separated(
-          key: ValueKey('tab_leads_${_expandirTodos ? 'all' : 'top10'}'),
-          padding: const EdgeInsets.only(top: 0, bottom: 80),
-          itemCount: itemCount,
-          separatorBuilder: (_, __) => const SizedBox(height: 6),
-          itemBuilder: (context, idx) {
-            if (mostrarLimite) {
-              if (idx < 10) {
-                final c = _leads[idx];
-                return widgets.LeadCard(
-                  nome: c['nome'] as String,
-                  telefone: c['tel'] as String,
-                  endereco: c['end'] as String,
-                  consultor: (c['cons'] as String?) ?? '',
-                  observacao: c['obs'] as String,
-                  dias: (c['dias'] as int?) ?? 0,
-                  urgente: (c['urgente'] as bool?) ?? false,
-                  alerta: (c['alerta'] as bool?) ?? false,
-                  onEditar: () => _abrirEditar(c, idx),
-                  onTransferir: () => _abrirTransferir(c),
-                );
-              }
-              if (idx == 10) {
-                return _CardVerMais(
-                  restante: total - 10,
-                  onTap: () => setState(() => _expandirTodos = true),
-                );
-              }
-            }
-            final c = _leads[idx];
-            return widgets.LeadCard(
-              nome: c['nome'] as String,
-              telefone: c['tel'] as String,
-              endereco: c['end'] as String,
-              consultor: (c['cons'] as String?) ?? '',
-              observacao: c['obs'] as String,
-              dias: (c['dias'] as int?) ?? 0,
-              urgente: (c['urgente'] as bool?) ?? false,
-              alerta: (c['alerta'] as bool?) ?? false,
-              onEditar: () => _abrirEditar(c, idx),
-              onTransferir: () => _abrirTransferir(c),
-            );
-          },
+            ],
+          ),
+          bottomNavigationBar: MenuInferior(
+            index: _tab,
+            controller: _pageController,
+            onChanged: (i) {
+              _pageController.animateToPage(
+                i,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+              );
+            },
+          ),
+          floatingActionButton: null, 
         ),
       ),
     );
@@ -307,6 +288,7 @@ class _HomeGestorState extends State<HomeGestor> {
         );
       },
     );
+
     if (result != null) {
       setState(() {
         _leads[index] = {
@@ -319,23 +301,22 @@ class _HomeGestorState extends State<HomeGestor> {
           'obs': result['observacoes'],
         };
       });
+
       try {
-        await _sb
-            .from('clientes')
-            .update({
-              'nome': result['nome'],
-              'telefone': result['telefone'],
-              'endereco': result['endereco'],
-              'bairro': result['bairro'],
-              'observacoes': result['observacoes'],
-            })
-            .eq('id', _leads[index]['id']);
+        await _sb.from('clientes').update({
+          'nome': result['nome'],
+          'telefone': result['telefone'],
+          'endereco': result['endereco'],
+          'bairro': result['bairro'],
+          'observacoes': result['observacoes'],
+        }).eq('id', _leads[index]['id']);
       } catch (_) {}
     }
   }
 
   Future<void> _abrirTransferir(Map<String, dynamic> c) async {
     final consultorAtualNome = (c['cons'] as String?) ?? '-';
+
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -350,6 +331,7 @@ class _HomeGestorState extends State<HomeGestor> {
         },
       ),
     );
+
     if (ok == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lead transferido com sucesso')),
@@ -358,16 +340,139 @@ class _HomeGestorState extends State<HomeGestor> {
   }
 }
 
+class _LeadsTab extends StatelessWidget {
+  final bool loading;
+  final String? erro;
+  final List<Map<String, dynamic>> leads;
+  final int idsCount;
+  final bool hasMore;
+  final bool loadingMore;
+  final bool expandirTodos;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function({bool initial}) onCarregarMais;
+  final void Function(Map<String, dynamic>, int) onEditar;
+  final void Function(Map<String, dynamic>) onTransferir;
+  final void Function(bool) setExpandirTodos;
+
+  const _LeadsTab({
+    super.key,
+    required this.loading,
+    required this.erro,
+    required this.leads,
+    required this.idsCount,
+    required this.hasMore,
+    required this.loadingMore,
+    required this.expandirTodos,
+    required this.onRefresh,
+    required this.onCarregarMais,
+    required this.onEditar,
+    required this.onTransferir,
+    required this.setExpandirTodos,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (erro != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(erro!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: onRefresh, child: const Text('Tentar novamente')),
+          ],
+        ),
+      );
+    }
+
+    final total = idsCount;
+    final mostrarLimite = !expandirTodos && total > 10;
+    final itemCount = mostrarLimite ? 11 : leads.length;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        setExpandirTodos(false);
+        await onRefresh();
+      },
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200 &&
+              hasMore &&
+              !loadingMore) {
+            onCarregarMais(initial: false);
+          }
+          return false;
+        },
+        child: ListView.separated(
+          key: ValueKey('tab_leads_${expandirTodos ? 'all' : 'top10'}'),
+          padding: const EdgeInsets.only(top: 0, bottom: 80),
+          itemCount: itemCount,
+          separatorBuilder: (_, __) => const SizedBox(height: 6),
+          itemBuilder: (context, idx) {
+            if (mostrarLimite) {
+              if (idx < 10) {
+                final c = leads[idx];
+                return widgets.LeadCard(
+                  nome: c['nome'] as String,
+                  telefone: c['tel'] as String,
+                  endereco: c['end'] as String,
+                  consultor: (c['cons'] as String?) ?? '',
+                  observacao: c['obs'] as String,
+                  dias: (c['dias'] as int?) ?? 0,
+                  urgente: (c['urgente'] as bool?) ?? false,
+                  alerta: (c['alerta'] as bool?) ?? false,
+                  onEditar: () => onEditar(c, idx),
+                  onTransferir: () => onTransferir(c),
+                );
+              }
+              if (idx == 10) {
+                return _CardVerMais(
+                  restante: total - 10,
+                  onTap: () => setExpandirTodos(true),
+                );
+              }
+            }
+
+            final c = leads[idx];
+            return widgets.LeadCard(
+              nome: c['nome'] as String,
+              telefone: c['tel'] as String,
+              endereco: c['end'] as String,
+              consultor: (c['cons'] as String?) ?? '',
+              observacao: c['obs'] as String,
+              dias: (c['dias'] as int?) ?? 0,
+              urgente: (c['urgente'] as bool?) ?? false,
+              alerta: (c['alerta'] as bool?) ?? false,
+              onEditar: () => onEditar(c, idx),
+              onTransferir: () => onTransferir(c),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- Auxiliares ----------------
+class _ClienteMini {
+  final dynamic id;
+  final String? nome;
+  final String? telefone;
+  const _ClienteMini({required this.id, this.nome, this.telefone});
+}
+
 class _CardVerMais extends StatelessWidget {
   final int restante;
   final VoidCallback onTap;
-  const _CardVerMais({required this.restante, required this.onTap});
+  const _CardVerMais({super.key, required this.restante, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     const branco = Color(0xFFFFFFFF);
     const texto = Color(0xFF231F20);
     const borda = Color(0xFFDFDFDF);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Material(
@@ -383,12 +488,14 @@ class _CardVerMais extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
-                    'Ver mais ($restante)',
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: texto),
+                    'Ver mais',
+                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: texto),
                   ),
                 ),
+                Text('($restante)', style: const TextStyle(color: texto)),
+                const SizedBox(width: 8),
                 const Icon(Icons.expand_more, color: texto),
               ],
             ),
@@ -399,51 +506,55 @@ class _CardVerMais extends StatelessWidget {
   }
 }
 
-class _ClienteMini {
-  final dynamic id;
-  final String? nome;
-  final String? telefone;
-  _ClienteMini({required this.id, this.nome, this.telefone});
-}
-
 class TransferirLeadDialog extends StatefulWidget {
   final _ClienteMini lead;
   final String consultorAtualNome;
-  final Future<void> Function(String novoUid) onConfirmar;
+  final Future<void> Function(String consultorUid) onConfirmar;
+
   const TransferirLeadDialog({
     super.key,
     required this.lead,
     required this.consultorAtualNome,
     required this.onConfirmar,
   });
+
   @override
   State<TransferirLeadDialog> createState() => _TransferirLeadDialogState();
 }
 
 class _TransferirLeadDialogState extends State<TransferirLeadDialog> {
+  final _formKey = GlobalKey<FormState>();
   final _sb = Supabase.instance.client;
-  String? _novoUid;
-  bool _carregando = false;
+
+  bool _loading = true;
+  bool _sending = false;
+  String? _erro;
   List<Map<String, dynamic>> _consultores = [];
+  String? _selecionado;
+
+  static const corFundo = Color(0xFFFFFFFF);
+  static const corTexto = Color(0xFF231F20);
+  static const corVermelho = Color(0xFFEA3124);
 
   @override
   void initState() {
     super.initState();
-    _carregarConsultores();
+    _loadConsultores();
   }
 
-  Future<void> _carregarConsultores() async {
+  Future<void> _loadConsultores() async {
+    setState(() => _loading = true);
     try {
       final rows = await _sb.from('consultores').select('uid, nome');
       setState(() {
         _consultores = List<Map<String, dynamic>>.from(rows);
+        _loading = false;
       });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao carregar consultores')),
-        );
-      }
+    } catch (_) {
+      setState(() {
+        _erro = 'Erro ao carregar consultores';
+        _loading = false;
+      });
     }
   }
 
@@ -451,51 +562,40 @@ class _TransferirLeadDialogState extends State<TransferirLeadDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Transferir Lead'),
-      content: _consultores.isEmpty
-          ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Lead: ${widget.lead.nome ?? ''}'),
-                const SizedBox(height: 12),
-                Text('Consultor atual: ${widget.consultorAtualNome}'),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Novo consultor',
-                    border: OutlineInputBorder(),
+      content: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+              ? Text(_erro!)
+              : Form(
+                  key: _formKey,
+                  child: DropdownButtonFormField<String>(
+                    value: _selecionado,
+                    items: _consultores
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c['uid'] as String,
+                            child: Text(c['nome'] as String),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _selecionado = v),
+                    decoration: const InputDecoration(labelText: 'Novo Consultor'),
                   ),
-                  value: _novoUid,
-                  onChanged: (v) => setState(() => _novoUid = v),
-                  items: _consultores.map<DropdownMenuItem<String>>((c) {
-                    return DropdownMenuItem<String>(
-                      value: c['uid'] as String,
-                      child: Text(c['nome'] ?? ''),
-                    );
-                  }).toList(),
                 ),
-              ],
-            ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () => Navigator.of(context).pop(false),
           child: const Text('Cancelar'),
         ),
-        ElevatedButton(
-          onPressed: _carregando || _novoUid == null
+        TextButton(
+          onPressed: _selecionado == null || _sending
               ? null
               : () async {
-                  setState(() => _carregando = true);
-                  try {
-                    await widget.onConfirmar(_novoUid!);
-                    if (mounted) Navigator.pop(context, true);
-                  } finally {
-                    if (mounted) setState(() => _carregando = false);
-                  }
+                  setState(() => _sending = true);
+                  await widget.onConfirmar(_selecionado!);
+                  if (mounted) Navigator.of(context).pop(true);
                 },
-          child: _carregando
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Transferir'),
+          child: const Text('Confirmar'),
         ),
       ],
     );
