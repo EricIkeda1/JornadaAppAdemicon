@@ -7,11 +7,23 @@ class MenuInferior extends StatefulWidget {
   final ValueChanged<int> onChanged;
   final PageController controller;
 
+  // Callbacks específicos por item (opcionais)
+  final VoidCallback? onLeads;
+  final VoidCallback? onVendas;
+  final VoidCallback? onConsultores; // ação trocada aqui
+  final VoidCallback? onEnderecos;
+  final VoidCallback? onExportar;
+
   const MenuInferior({
     super.key,
     required this.index,
     required this.onChanged,
     required this.controller,
+    this.onLeads,
+    this.onVendas,
+    this.onConsultores,
+    this.onEnderecos,
+    this.onExportar,
   });
 
   @override
@@ -30,20 +42,41 @@ class _MenuInferiorState extends State<MenuInferior> {
   static const double _pillW = 100;
   static const double _padBottom = 10;
 
+  // Ícones; Consultores -> person_rounded como na referência
   final _items = const [
     _Item(icon: Icons.people_alt_rounded, label: 'Leads'),
-    _Item(icon: Icons.account_circle_rounded, label: 'Consultores'),
+    _Item(icon: Icons.show_chart_rounded, label: 'Vendas'),
+    _Item(icon: Icons.person_rounded, label: 'Consultores'),
     _Item(icon: Icons.place_rounded, label: 'Endereços'),
     _Item(icon: Icons.file_download_rounded, label: 'Exportar'),
   ];
 
   double _page = 0;
 
+  double _lastEmitted = -10000;
+  static const double _throttleDelta = 0.007;
+  static const double _snapEps = 0.02;
+  int _lastStableIndex = 0;
+
   @override
   void initState() {
     super.initState();
     _page = widget.controller.initialPage.toDouble();
+    _lastStableIndex = _page.round();
     widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant MenuInferior oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final idx = widget.index.toDouble();
+    final cp = widget.controller.page;
+    if ((idx - _page).abs() > 0.001 &&
+        (cp == null || (cp - idx).abs() <= _snapEps)) {
+      _page = idx;
+      _lastStableIndex = idx.toInt();
+      setState(() {});
+    }
   }
 
   @override
@@ -54,7 +87,24 @@ class _MenuInferiorState extends State<MenuInferior> {
 
   void _onScroll() {
     final p = widget.controller.page;
-    if (p != null && p != _page) {
+    if (p == null || p.isNaN) return;
+
+    if ((p - _lastEmitted).abs() < _throttleDelta) return;
+    _lastEmitted = p;
+
+    final nearest = p.roundToDouble();
+    final delta = (p - nearest).abs();
+
+    if (delta <= _snapEps) {
+      final ni = nearest.toInt();
+      if (ni != _lastStableIndex || (nearest - _page).abs() > 0.001) {
+        _lastStableIndex = ni;
+        setState(() => _page = nearest);
+      }
+      return;
+    }
+
+    if ((p - _page).abs() > 0.003) {
       setState(() => _page = p);
     }
   }
@@ -63,8 +113,31 @@ class _MenuInferiorState extends State<MenuInferior> {
     final count = _items.length;
     final slotW = size.width / count;
     final double y = (_barH - _pillH) / 2;
-    final double x = (_page.clamp(0.0, (count - 1).toDouble()) * slotW) + (slotW - _pillW) / 2;
+    final double x = (_page.clamp(0.0, (count - 1).toDouble()) * slotW) +
+        (slotW - _pillW) / 2;
     return Rect.fromLTWH(x, y, _pillW, _pillH);
+  }
+
+  // Dispara callbacks específicos e o onChanged padrão
+  void _handleTap(int i) {
+    switch (i) {
+      case 0:
+        widget.onLeads?.call();
+        break;
+      case 1:
+        widget.onVendas?.call();
+        break;
+      case 2:
+        widget.onConsultores?.call(); // novo comportamento
+        break;
+      case 3:
+        widget.onEnderecos?.call();
+        break;
+      case 4:
+        widget.onExportar?.call();
+        break;
+    }
+    widget.onChanged(i);
   }
 
   @override
@@ -73,17 +146,24 @@ class _MenuInferiorState extends State<MenuInferior> {
       top: false,
       child: LayoutBuilder(
         builder: (context, cons) {
-          final size = Size(cons.maxWidth, _barH);
-          final pill = _pillRect(size);
-          final frac = (_page - _page.floor()).clamp(0.0, 1.0);
-          final goingRight = _page >= _page.floorToDouble();
+          final pill = _pillRect(Size(cons.maxWidth, _barH));
 
-          final inertia = (goingRight ? frac : - (1 - frac)) * 8.0;
+          final base = _lastStableIndex.toDouble();
+          final next = (_page >= base) ? base + 1.0 : base - 1.0;
+          final spanStart = (_page >= base) ? base : next;
+          final spanEnd = (_page >= base) ? next : base;
+          final fracRaw =
+              ((_page - spanStart) / (spanEnd - spanStart)).clamp(0.0, 1.0);
+          final eased = Curves.easeInOut.transform(fracRaw);
+          final goingRight = _page >= base;
+          final inertia = (goingRight ? eased : -(1 - eased)) * 8.0;
 
           return Container(
             decoration: const BoxDecoration(
               color: _bg,
-              boxShadow: [BoxShadow(color: _shadow, blurRadius: 6, offset: Offset(0, -2))],
+              boxShadow: [
+                BoxShadow(color: _shadow, blurRadius: 6, offset: Offset(0, -2))
+              ],
             ),
             height: _barH + _padBottom,
             padding: const EdgeInsets.only(bottom: _padBottom),
@@ -105,6 +185,7 @@ class _MenuInferiorState extends State<MenuInferior> {
                   ),
                 ),
 
+                // Pílula líquida
                 Positioned.fill(
                   child: IgnorePointer(
                     child: CustomPaint(
@@ -121,12 +202,13 @@ class _MenuInferiorState extends State<MenuInferior> {
                   ),
                 ),
 
+                // Itens clicáveis
                 Row(
                   children: List.generate(_items.length, (i) {
                     return Expanded(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(18),
-                        onTap: () => widget.onChanged(i),
+                        onTap: () => _handleTap(i),
                         child: SizedBox(
                           height: _barH,
                           child: _AnimatedItem(
@@ -158,15 +240,15 @@ class _AnimatedItem extends StatelessWidget {
   final _Item item;
   final int index;
   final double page;
-  const _AnimatedItem({required this.item, required this.index, required this.page});
+  const _AnimatedItem(
+      {required this.item, required this.index, required this.page});
 
   static const Color _inactive = Color(0xFF6B6B6B);
 
   @override
   Widget build(BuildContext context) {
     final dist = (page - index).abs().clamp(0.0, 1.0);
-    final t = 1.0 - Curves.easeOut.transform(dist); 
-
+    final t = 1.0 - Curves.easeOut.transform(dist);
     final iconSize = lerpDouble(24, 28, t)!;
     final labelSize = lerpDouble(11, 12.5, t)!;
     final iconColor = Color.lerp(_inactive, Colors.white, t)!;
@@ -184,7 +266,11 @@ class _AnimatedItem extends StatelessWidget {
           const SizedBox(height: 6),
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 120),
-            style: TextStyle(fontSize: labelSize, color: labelColor, fontWeight: fontWeight),
+            style: TextStyle(
+              fontSize: labelSize,
+              color: labelColor,
+              fontWeight: fontWeight,
+            ),
             child: Text(item.label),
           ),
         ],
@@ -217,10 +303,12 @@ class _LiquidPillPainter extends CustomPainter {
     final y = (barH - pillH) / 2;
     final base = page.floor().clamp(0, count - 1);
     final frac = (page - base).clamp(0.0, 1.0);
-    final startX = (base * slotW) + (slotW - pillW) / 2;
-    final endX = (((base + 1).clamp(0, count - 1)) * slotW) + (slotW - pillW) / 2;
 
-    final stretch = 1 + 0.08 * math.sin(frac * math.pi);
+    final startX = (base * slotW) + (slotW - pillW) / 2;
+    final endX =
+        (((base + 1).clamp(0, count - 1)) * slotW) + (slotW - pillW) / 2;
+
+    final stretch = 1 + 0.06 * math.sin(frac * math.pi);
     final w = pillW * stretch;
     final x = lerpDouble(startX, endX, frac)! + (pillW - w) / 2;
 
@@ -241,16 +329,14 @@ class _LiquidPillPainter extends CustomPainter {
     final paint = Paint()
       ..shader = shader
       ..style = PaintingStyle.fill;
-
     final light = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white.withOpacity(0.07)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
+      ..strokeWidth = 1.1;
     final glow = Paint()
-      ..color = Colors.white.withOpacity(0.06)
+      ..color = Colors.white.withOpacity(0.05)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6;
+      ..strokeWidth = 5;
 
     canvas.drawRRect(r, paint);
     canvas.drawRRect(r, glow);

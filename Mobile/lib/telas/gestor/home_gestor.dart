@@ -7,7 +7,8 @@ import 'components/gestor_header_row.dart';
 import 'components/menu_inferior.dart';
 import 'telas/lista_consultor.dart';
 import 'telas/enderecos.dart';
-import 'telas/exportar.dart';  
+import 'telas/exportar.dart';
+import 'telas/vendas.dart';
 
 class HomeGestor extends StatefulWidget {
   const HomeGestor({super.key, this.initialTab = 0});
@@ -50,6 +51,8 @@ class _HomeGestorState extends State<HomeGestor> {
   String _query = '';
   List<Map<String, dynamic>> _filteredLeads = [];
 
+  String get _gestorId => _sb.auth.currentUser!.id;
+
   @override
   void initState() {
     super.initState();
@@ -86,20 +89,32 @@ class _HomeGestorState extends State<HomeGestor> {
     }).toList();
   }
 
+  // UIDs (auth) dos consultores do meu time
+  Future<List<String>> _uidsConsultoresDoMeuTime() async {
+    final rows = await _sb
+        .from('consultores')
+        .select('uid')
+        .eq('gestor_id', _gestorId);
+    return (rows as List)
+        .map((r) => r['uid'] as String?)
+        .whereType<String>()
+        .toList();
+  }
+
   Future<void> _carregarTotalDb() async {
     try {
-      final res = await _sb.rpc('get_clientes_total');
-      final total = (res is int)
-          ? res
-          : (res is num)
-              ? res.toInt()
-              : 0;
-      setState(() => _totalDb = total);
+      final consUids = await _uidsConsultoresDoMeuTime();
+      if (consUids.isEmpty) {
+        setState(() => _totalDb = 0);
+        return;
+      }
+      final rows = await _sb
+          .from('clientes')
+          .select('id')
+          .inFilter('consultor_uid_t', consUids);
+      setState(() => _totalDb = (rows as List).length);
     } catch (_) {
-      try {
-        final rows = await _sb.from('clientes').select('id');
-        setState(() => _totalDb = rows.length);
-      } catch (__){}
+      setState(() => _totalDb = 0);
     }
   }
 
@@ -122,16 +137,31 @@ class _HomeGestorState extends State<HomeGestor> {
       setState(() => _loadingMore = true);
 
       final start = _page * _pageSize;
-      final end = start + _pageSize - 1;
 
-      final rows = await _sb
+      // 1) UIDs dos consultores do meu time
+      final consUids = await _uidsConsultoresDoMeuTime();
+      if (consUids.isEmpty) {
+        setState(() {
+          _hasMore = false;
+          _loading = false;
+          _loadingMore = false;
+          _aplicarFiltro();
+        });
+        return;
+      }
+
+      // 2) Busca todos os clientes por UID do time e pagina em memória
+      final rowsAll = await _sb
           .from('clientes')
           .select('id, nome, endereco, bairro, telefone, data_visita, observacoes, consultor_uid_t')
-          .order('data_visita', ascending: false, nullsFirst: true)
-          .range(start, end);
+          .inFilter('consultor_uid_t', consUids)
+          .order('data_visita', ascending: false, nullsFirst: true);
+
+      final all = (rowsAll as List).cast<Map<String, dynamic>>();
+      final slice = all.skip(start).take(_pageSize).toList();
 
       final batch = <Map<String, dynamic>>[];
-      for (final r in rows) {
+      for (final r in slice) {
         final id = r['id'];
         if (_ids.contains(id)) continue;
         _ids.add(id);
@@ -151,24 +181,28 @@ class _HomeGestorState extends State<HomeGestor> {
       }
 
       final uids = batch.map((e) => e['consUid']).where((e) => e != null).toSet().cast<String>().toList();
+      final nomeMap = <String, String>{};
       if (uids.isNotEmpty) {
-        final consRows = await _sb.from('consultores').select('uid, nome').inFilter('uid', uids);
-        final map = <String, String>{};
-        for (final c in consRows) {
+        final consRowsUid = await _sb.from('consultores').select('uid, nome').inFilter('uid', uids);
+        for (final c in (consRowsUid as List)) {
           final uid = c['uid'] as String?;
           final nome = c['nome'] as String?;
-          if (uid != null && nome != null) map[uid] = nome;
-        }
-        for (final e in batch) {
-          final uid = e['consUid'] as String?;
-          e['cons'] = uid != null ? (map[uid] ?? '') : '';
+          if (uid != null && nome != null) nomeMap[uid] = nome;
         }
       }
+      for (final e in batch) {
+        final uid = e['consUid'] as String?;
+        e['cons'] = uid != null ? (nomeMap[uid] ?? '') : '';
+      }
+
+      final totalAll = all.length;
+      final nextStart = (_page + 1) * _pageSize;
+      final hasMore = nextStart < totalAll;
 
       setState(() {
         _leads.addAll(batch);
         _page += 1;
-        _hasMore = rows.length == _pageSize;
+        _hasMore = hasMore;
         _loading = false;
         _loadingMore = false;
         _aplicarFiltro();
@@ -302,7 +336,7 @@ class _HomeGestorState extends State<HomeGestor> {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 84),
                   child: _withGlobalSwipe(
-                    pageCount: 4,
+                    pageCount: 5,
                     child: Column(
                       children: [
                         if (_tab == 0)
@@ -338,6 +372,7 @@ class _HomeGestorState extends State<HomeGestor> {
                                 onTransferir: _abrirTransferir,
                                 setExpandirTodos: (v) => setState(() => _expandirTodos = v),
                               ),
+                              const VendasPage(),
                               Navigator(
                                 key: _consultoresNavKey,
                                 onGenerateRoute: (settings) =>
@@ -361,7 +396,6 @@ class _HomeGestorState extends State<HomeGestor> {
                   ),
                 ),
               ),
-
               Align(
                 alignment: Alignment.bottomCenter,
                 child: MenuInferior(
@@ -373,6 +407,7 @@ class _HomeGestorState extends State<HomeGestor> {
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
                     );
+                    setState(() => _tab = i);
                   },
                 ),
               ),
@@ -494,6 +529,8 @@ class _TransferirLeadDialogState extends State<TransferirLeadDialog> {
   List<Map<String, dynamic>> _consultores = [];
   String? _selecionado;
 
+  String get _gestorId => _sb.auth.currentUser!.id;
+
   @override
   void initState() {
     super.initState();
@@ -503,9 +540,12 @@ class _TransferirLeadDialogState extends State<TransferirLeadDialog> {
   Future<void> _loadConsultores() async {
     setState(() => _loading = true);
     try {
-      final rows = await _sb.from('consultores').select('uid, nome');
+      final rows = await _sb
+          .from('consultores')
+          .select('uid, nome')
+          .eq('gestor_id', _gestorId);
       setState(() {
-        _consultores = List<Map<String, dynamic>>.from(rows);
+        _consultores = List<Map<String, dynamic>>.from(rows as List);
         _loading = false;
       });
     } catch (_) {

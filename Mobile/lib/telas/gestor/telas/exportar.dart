@@ -19,10 +19,12 @@ class _ExportarPageState extends State<ExportarPage> {
   static const bg = Color(0xFFF7F7F7);
   static const shadow = Color(0x1A000000);
 
-  static const double kCanvas = 360; 
-  static const double kPadH = 12;   
+  static const double kCanvas = 360;
+  static const double kPadH = 12;
   static const double kGapHeaderToCard = 12;
   static const double kGapCards = 12;
+
+  String get _gestorId => sb.auth.currentUser!.id;
 
   @override
   void initState() {
@@ -30,33 +32,65 @@ class _ExportarPageState extends State<ExportarPage> {
     _carregarResumo();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  // Busca UIDs dos consultores do meu time
+  Future<List<String>> _uidsConsultoresDoMeuTime() async {
+    final rows = await sb
+        .from('consultores')
+        .select('uid')
+        .eq('gestor_id', _gestorId);
+    return (rows as List)
+        .map((r) => r['uid'] as String?)
+        .whereType<String>()
+        .toList();
+  }
+
+  // Query base filtrando apenas clientes do meu time
+  Future<List<Map<String, dynamic>>> _baseClientesSelect() async {
+    final consUids = await _uidsConsultoresDoMeuTime();
+    if (consUids.isEmpty) return <Map<String, dynamic>>[];
+
+    final rows = await sb
+        .from('clientes')
+        .select('id,nome,endereco,bairro,cidade,estado,cep,telefone,data_visita,observacoes,consultor_uid_t,hora_visita,responsavel')
+        .inFilter('consultor_uid_t', consUids);
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
   Future<void> _carregarResumo() async {
     try {
-      final res = await sb.from('clientes').select('id').count();
-      setState(() => _qtdClientes = res.count ?? 0);
+      final rows = await _baseClientesSelect();
+      if (!mounted) return;
+      setState(() => _qtdClientes = rows.length);
     } catch (_) {
+      if (!mounted) return;
       setState(() => _qtdClientes = null);
     }
   }
 
   Future<void> _baixarCSV() async {
+    if (!mounted) return;
     setState(() => _loadingCsv = true);
     try {
-      final rows = await sb
-          .from('clientes')
-          .select('id,nome,endereco,bairro,cidade,estado,cep,telefone,data_visita,observacoes,consultor_uid_t,hora_visita,responsavel,consultor_id')
-          .order('nome', ascending: true);
+      final rows = await _baseClientesSelect();
+      // Ordena por nome em memória para manter base igual ao contador
+      rows.sort((a, b) => ((a['nome'] ?? '') as String).toLowerCase().compareTo(((b['nome'] ?? '') as String).toLowerCase()));
 
-      final list = (rows as List);
       final buffer = StringBuffer();
-      buffer.writeln('id;nome;endereco;bairro;cidade;estado;cep;telefone;data_visita;observacoes;consultor_uid_t;hora_visita;responsavel;consultor_id');
+      const header =
+          'id;nome;endereco;bairro;cidade;estado;cep;telefone;data_visita;observacoes;consultor_uid_t;hora_visita;responsavel';
+      buffer.writeln(header);
 
       String esc(dynamic v) {
         final s = (v ?? '').toString().replaceAll('\n', ' ').replaceAll(';', ',');
         return '"$s"';
       }
 
-      for (final r in list) {
+      for (final r in rows) {
         buffer.writeln([
           esc(r['id']),
           esc(r['nome']),
@@ -71,10 +105,12 @@ class _ExportarPageState extends State<ExportarPage> {
           esc(r['consultor_uid_t']),
           esc(r['hora_visita']),
           esc(r['responsavel']),
-          esc(r['consultor_id']),
         ].join(';'));
       }
 
+      if (mounted) setState(() => _qtdClientes = rows.length);
+
+      if (!mounted) return;
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -84,12 +120,12 @@ class _ExportarPageState extends State<ExportarPage> {
         ),
       );
     } finally {
-      setState(() => _loadingCsv = false);
-      _carregarResumo();
+      if (mounted) setState(() => _loadingCsv = false);
     }
   }
 
   void _copiarLink() {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copiado para a área de transferência.')));
   }
 
@@ -122,7 +158,6 @@ class _ExportarPageState extends State<ExportarPage> {
         boxShadow: const [BoxShadow(color: shadow, blurRadius: 8, offset: Offset(0, 2))],
       );
 
-  // Card “Exportar para CSV”
   Widget _exportCard() {
     return Container(
       decoration: _cardDeco(),
