@@ -26,16 +26,12 @@ class LeadCard extends StatelessWidget {
     required this.onTransferir,
   });
 
-  // Paleta usada anteriormente
   static const branco = Color(0xFFFFFFFF);
   static const texto = Color(0xFF231F20);
   static const vermelho = Color(0xFFEA3124);
   static const cinzaBorda = Color(0xFFDFDFDF);
   static const cinzaIcone = Color(0xFF6D6D6D);
-
-  // Fundo suave da observação (mesma sensação do anterior)
-  // Caso usasse exatamente o mesmo ARGB, substitua aqui.
-  static const obsBg = Color(0xFFFFF2F2); // tom claro coerente com o vermelho
+  static const obsBg = Color(0xFFFFF2F2);
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +47,6 @@ class LeadCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cabeçalho
             Row(
               children: [
                 Expanded(
@@ -65,7 +60,6 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Telefone
             Row(
               children: [
                 const Icon(Icons.phone, size: 16, color: cinzaIcone),
@@ -77,7 +71,6 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // Endereço
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -90,7 +83,6 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // Consultor
             Row(
               children: [
                 const Icon(Icons.person_outline, size: 16, color: cinzaIcone),
@@ -105,13 +97,12 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // OBSERVAÇÃO — largura total com mesma cor do anterior
             Container(
               width: double.infinity,
               constraints: const BoxConstraints(minHeight: 44),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: obsBg, // mesma faixa suave
+                color: obsBg, 
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: vermelho.withOpacity(0.25)),
               ),
@@ -121,7 +112,7 @@ class LeadCard extends StatelessWidget {
                   children: [
                     const TextSpan(
                       text: 'Obs: ',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: vermelho), // mesmo vermelho
+                      style: TextStyle(fontWeight: FontWeight.w700, color: vermelho), 
                     ),
                     TextSpan(text: observacao.isEmpty ? '—' : observacao),
                   ],
@@ -131,7 +122,6 @@ class LeadCard extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // Ações
             Row(
               children: [
                 _BotaoTexto(
@@ -169,7 +159,6 @@ class _DiasBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cores coerentes com os estados anteriores
     Color bg = const Color(0xFFE7F7EE);
     Color fg = const Color(0xFF1B8151);
     if (urgente) {
