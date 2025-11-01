@@ -66,7 +66,6 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
   final Set<String> _ruasTodas = <String>{};
   String? _ruaSelecionada;
 
-  // canal realtime para invalidar caches e forçar rebuild do StreamBuilder
   RealtimeChannel? _chan;
 
   @override
@@ -102,7 +101,6 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
           schema: 'public',
           table: 'clientes',
           callback: (payload) {
-            // qualquer insert/update/delete invalida os caches e rebuilda
             if (mounted) {
               setState(_invalidateCaches);
             }
@@ -116,7 +114,6 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     _cacheFinalizados = null;
   }
 
-  // Compatível: select(...).eq(...).order(...).asStream()
   Stream<List<Map<String, dynamic>>> get _meusClientesStream {
     final user = _client.auth.currentSession?.user;
     if (user == null) return const Stream<List<Map<String, dynamic>>>.empty();

@@ -1,36 +1,162 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 class VendasPage extends StatefulWidget {
   const VendasPage({super.key});
-
   @override
   State<VendasPage> createState() => _VendasPageState();
 }
 
 class _VendasPageState extends State<VendasPage> {
+  final SupabaseClient _client = Supabase.instance.client;
+  RealtimeChannel? _chan;
+
   String consultor = '';
 
-  final double totalVendas = 328000;
-  final double mediaMensal = 55000;
-  final double melhorMesValor = 67000;
-  final int periodoMeses = 6;
-  final double percentualMeta = 1.025; 
+  double totalVendas = 0;
+  double mediaMensal = 0;
+  double melhorMesValor = 0;
+  int periodoMeses = 6;
+  double percentualMeta = 1.0;
 
-  final List<String> meses = const ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-  final List<double> realizado = const [45000, 52000, 47000, 61000, 56000, 69000];
-  final List<double> meta = const [48000, 50000, 50000, 52000, 56000, 60000];
+  List<String> meses = const [];
+  List<double> realizado = const [];
+  List<double> meta = const [];
 
   final Color primary = const Color(0xFFDC2C2C);
   final Color primaryLight = const Color(0xFFF06666);
-
   final Gradient headerBg = const LinearGradient(
     colors: [Color(0xFFF7F9FB), Color(0xFFFFFFFF)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
-  String moeda(double v) => 'R\$ ${v ~/ 1000}k';
+  String moeda(double v) => NumberFormat.simpleCurrency(locale: 'pt_BR').format(v);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregarDados());
+    _inscreverRealtime();
+  }
+
+  @override
+  void dispose() {
+    if (_chan != null) _client.removeChannel(_chan!);
+    super.dispose();
+  }
+
+  void _inscreverRealtime() {
+    _chan = _client
+        .channel('realtime:dash_vendas_finalizadas')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'clientes',
+          callback: (_) {
+            _carregarDados();
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _carregarDados() async {
+    try {
+      final mensal = await _client
+          .from('vendas_mensais')
+          .select('mes_ord, mes_abrev, realizado, meta')
+          .order('mes_ord', ascending: true);
+
+      if (mensal is List && mensal.isNotEmpty) {
+        meses = mensal.map((e) => (e['mes_abrev'] ?? '').toString()).toList().cast<String>();
+        realizado = mensal.map((e) => (e['realizado'] ?? 0).toDouble()).toList().cast<double>();
+        meta = mensal.map((e) => (e['meta'] ?? 0).toDouble()).toList().cast<double>();
+      } else {
+        await _agregarLocalmenteApenasFinalizadas();
+      }
+
+      final kpis = await _client.from('vendas_kpis').select().limit(1);
+      if (kpis is List && kpis.isNotEmpty) {
+        final k = kpis.first as Map<String, dynamic>;
+        totalVendas = (k['total_vendas'] ?? 0).toDouble();
+        mediaMensal = (k['media_mensal'] ?? 0).toDouble();
+        melhorMesValor = (k['melhor_mes'] ?? 0).toDouble();
+        periodoMeses = (k['periodo_meses'] ?? 6).toInt();
+        percentualMeta = (k['percentual_meta'] ?? 1.0).toDouble();
+      } else {
+        _calcularKpisFallback();
+      }
+    } catch (_) {
+      await _agregarLocalmenteApenasFinalizadas();
+      _calcularKpisFallback();
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _agregarLocalmenteApenasFinalizadas() async {
+    final now = DateTime.now();
+    final inicio = DateTime(now.year, now.month - 5, 1);
+    final inicioStr = DateFormat('yyyy-MM-dd').format(inicio);
+
+    final res = await _client
+        .from('clientes')
+        .select('data_visita, status_negociacao, valor_proposta')
+        .filter('status_negociacao', 'in', '("fechado","fechada","venda")')
+        .gte('data_visita', inicioStr)
+        .order('data_visita', ascending: true);
+
+    final Map<String, double> somaMes = {};
+    final Map<String, double> metaMes = {};
+    final DateFormat abrev = DateFormat('MMM', 'pt_BR');
+
+    for (var i = 0; i < 6; i++) {
+      final d = DateTime(now.year, now.month - 5 + i, 1);
+      final key = abrev.format(d);
+      somaMes[key] = 0;
+      metaMes[key] = 50000;
+    }
+
+    if (res is List) {
+      for (final row in res) {
+        final ds = (row['data_visita'] ?? '').toString();
+        if (ds.isEmpty) continue;
+        final d = DateTime.tryParse(ds)?.toLocal();
+        if (d == null) continue;
+
+        final key = abrev.format(DateTime(d.year, d.month, 1));
+
+        final rawValor = row['valor_proposta'];
+        final v = switch (rawValor) {
+          num n => n.toDouble(),
+          String s => double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
+          _ => 0.0,
+        };
+
+        somaMes.update(key, (old) => old + v, ifAbsent: () => v);
+      }
+    }
+
+    meses = somaMes.keys.toList()
+      ..sort((a, b) {
+        final order = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        return order.indexOf(a.toLowerCase()).compareTo(order.indexOf(b.toLowerCase()));
+      });
+
+    realizado = meses.map((m) => somaMes[m] ?? 0).toList();
+    meta = meses.map((m) => metaMes[m] ?? 0).toList();
+  }
+
+  void _calcularKpisFallback() {
+    totalVendas = realizado.fold<double>(0, (a, b) => a + b);
+    periodoMeses = meses.isEmpty ? 6 : meses.length;
+    mediaMensal = periodoMeses == 0 ? 0 : totalVendas / periodoMeses;
+    melhorMesValor = realizado.isEmpty ? 0 : realizado.reduce((a, b) => a > b ? a : b);
+    final totalMeta = meta.fold<double>(0, (a, b) => a + b);
+    percentualMeta = totalMeta == 0 ? 1.0 : (totalVendas / totalMeta);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,13 +167,7 @@ class _VendasPageState extends State<VendasPage> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            const SliverAppBar(
-              pinned: false,
-              backgroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 0,
-            ),
-
+            const SliverAppBar(pinned: false, backgroundColor: Colors.white, elevation: 0, toolbarHeight: 0),
             SliverToBoxAdapter(
               child: Container(
                 decoration: BoxDecoration(gradient: headerBg),
@@ -62,7 +182,6 @@ class _VendasPageState extends State<VendasPage> {
                 ),
               ),
             ),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(12, 6, 12, safe.bottom + 12),
@@ -75,41 +194,18 @@ class _VendasPageState extends State<VendasPage> {
                           title: 'Total Vendas',
                           value: moeda(totalVendas),
                           icon: Icons.attach_money_rounded,
-                          gradient: LinearGradient(
-                            colors: [primary, primaryLight],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: LinearGradient(colors: [primary, primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
                         ),
-                        _KpiCard(
-                          title: 'Média Mensal',
-                          value: moeda(mediaMensal),
-                          icon: Icons.track_changes_rounded,
-                        ),
-                        _KpiCard(
-                          title: 'Melhor Mês',
-                          value: moeda(melhorMesValor),
-                          icon: Icons.emoji_events_outlined,
-                        ),
-                        _KpiCard(
-                          title: 'Período',
-                          value: '$periodoMeses meses',
-                          icon: Icons.event_note_outlined,
-                        ),
+                        _KpiCard(title: 'Média Mensal', value: moeda(mediaMensal), icon: Icons.track_changes_rounded),
+                        _KpiCard(title: 'Melhor Mês', value: moeda(melhorMesValor), icon: Icons.emoji_events_outlined),
+                        _KpiCard(title: 'Período', value: '$periodoMeses meses', icon: Icons.event_note_outlined),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
                     _ChartCard(
                       title: 'Evolução de Vendas',
-                      subtitle: 'Comparativo entre vendas realizadas e metas mensais',
-                      child: _BarrasVendasChart(
-                        meses: meses,
-                        realizado: realizado,
-                        meta: meta,
-                        primary: primary,
-                      ),
+                      subtitle: 'Somente vendas finalizadas entram nos totais e metas',
+                      child: _BarrasVendasChart(meses: meses, realizado: realizado, meta: meta, primary: primary),
                     ),
                   ],
                 ),
@@ -150,18 +246,8 @@ class _HeaderRow extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [primary, primaryLight],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
+            gradient: LinearGradient(colors: [primary, primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))],
           ),
           child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 22),
         ),
@@ -175,12 +261,7 @@ class _HeaderRow extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF222222),
-                  letterSpacing: .1,
-                ),
+                style: theme.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w700, color: const Color(0xFF222222), letterSpacing: .1),
               ),
               if (showConsultor) ...[
                 const SizedBox(height: 2),
@@ -188,20 +269,13 @@ class _HeaderRow extends StatelessWidget {
                   consultorText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.black54, fontWeight: FontWeight.w500),
                 ),
               ],
             ],
           ),
         ),
-        _MetaBadge(
-          text: badgeText,
-          color: const Color(0xFFDAF5D7),  
-          textColor: const Color(0xFF1E7B34), 
-        ),
+        _MetaBadge(text: badgeText, color: const Color(0xFFDAF5D7), textColor: const Color(0xFF1E7B34)),
       ],
     );
   }
@@ -222,21 +296,9 @@ class _MetaBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))],
       ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: textColor,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
+      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: textColor, fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -295,39 +357,9 @@ class _KpiLayoutFixed extends StatelessWidget {
     final t = Theme.of(context);
     return Stack(
       children: [
-        Positioned(
-          top: _iconTop,
-          left: _iconLeft,
-          child: SizedBox(height: 24, width: 24, child: FittedBox(child: icon)),
-        ),
-        Positioned(
-          top: _titleTop,
-          left: _side,
-          right: _side,
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: t.textTheme.labelLarge?.copyWith(
-              color: titleColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Positioned(
-          left: _side,
-          right: _side,
-          bottom: _valueBottom,
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: t.textTheme.titleMedium?.copyWith(
-              color: valueColor,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+        Positioned(top: _iconTop, left: _iconLeft, child: SizedBox(height: 24, width: 24, child: FittedBox(child: icon))),
+        Positioned(top: _titleTop, left: _side, right: _side, child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.labelLarge?.copyWith(color: titleColor, fontWeight: FontWeight.w600))),
+        Positioned(left: _side, right: _side, bottom: _valueBottom, child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.titleMedium?.copyWith(color: valueColor, fontWeight: FontWeight.w800))),
       ],
     );
   }
@@ -366,13 +398,7 @@ class _BigKpiCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Gradient gradient;
-
-  const _BigKpiCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.gradient,
-  });
+  const _BigKpiCard({required this.title, required this.value, required this.icon, required this.gradient});
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +422,6 @@ class _BigKpiCard extends StatelessWidget {
   }
 }
 
-// ========== CHART ==========
 class _ChartCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -418,22 +443,10 @@ class _ChartCard extends StatelessWidget {
             Row(children: [
               const Icon(Icons.trending_up, color: Color(0xFFDD3A3A)),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
+              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             ]),
             const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
+            Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
             SizedBox(height: 260, child: child),
           ],
@@ -448,13 +461,7 @@ class _BarrasVendasChart extends StatelessWidget {
   final List<double> realizado;
   final List<double> meta;
   final Color primary;
-
-  const _BarrasVendasChart({
-    required this.meses,
-    required this.realizado,
-    required this.meta,
-    required this.primary,
-  });
+  const _BarrasVendasChart({required this.meses, required this.realizado, required this.meta, required this.primary});
 
   @override
   Widget build(BuildContext context) {
@@ -464,17 +471,13 @@ class _BarrasVendasChart extends StatelessWidget {
         barsSpace: 10,
         barRods: [
           BarChartRodData(
-            toY: realizado[i] / 1000,
+            toY: (realizado[i] / 1000).clamp(0, double.infinity),
             width: 14,
             borderRadius: BorderRadius.circular(4),
-            gradient: LinearGradient(
-              colors: [primary, primary.withOpacity(.85)],
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-            ),
+            gradient: LinearGradient(colors: [primary, primary.withOpacity(.85)], begin: Alignment.bottomCenter, end: Alignment.topCenter),
           ),
           BarChartRodData(
-            toY: meta[i] / 1000,
+            toY: (meta[i] / 1000).clamp(0, double.infinity),
             width: 14,
             borderRadius: BorderRadius.circular(4),
             color: Colors.grey.shade300,
@@ -483,29 +486,30 @@ class _BarrasVendasChart extends StatelessWidget {
       );
     });
 
+    final maxY = [
+      ...realizado.map((e) => e / 1000),
+      ...meta.map((e) => e / 1000),
+      10,
+    ].reduce((a, b) => a > b ? a : b) * 1.1;
+
     return BarChart(
       BarChartData(
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          getDrawingHorizontalLine: (v) =>
-              FlLine(color: Colors.grey.shade200, strokeWidth: 1),
+          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         alignment: BarChartAlignment.spaceAround,
-        maxY: 80,
+        maxY: maxY,
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 42,
+              reservedSize: 48,
               getTitlesWidget: (value, meta) => Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: Text('R\$ ${value.toInt()}k',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelSmall
-                        ?.copyWith(color: Colors.black54)),
+                child: Text('R\$ ${value.toInt()}k', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.black54)),
               ),
             ),
           ),
@@ -517,11 +521,7 @@ class _BarrasVendasChart extends StatelessWidget {
                 if (i < 0 || i >= meses.length) return const SizedBox();
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text(meses[i],
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: Colors.black87)),
+                  child: Text(meses[i], style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.black87)),
                 );
               },
             ),
