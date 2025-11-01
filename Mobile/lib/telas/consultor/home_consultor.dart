@@ -49,23 +49,18 @@ class _HomeConsultorState extends State<HomeConsultor> {
     if (user == null || !mounted) return;
 
     try {
-      // 1) Tenta por id (uuid recomendado)
       Map<String, dynamic>? doc = await _client
           .from('consultores')
           .select('id, uid, nome')
           .eq('id', user.id)
           .maybeSingle();
 
-      debugPrint('[perfil] uid=${user.id} -> by id: $doc');
-
-      // 2) Se não achou, tenta pela coluna uid (para schemas que usam uid)
       if (doc == null) {
         doc = await _client
             .from('consultores')
             .select('id, uid, nome')
             .eq('uid', user.id)
             .maybeSingle();
-        debugPrint('[perfil] uid=${user.id} -> by uid: $doc');
       }
 
       final nomeTabela = (doc?['nome'] as String?)?.trim() ?? '';
@@ -74,8 +69,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
           nomeTabela.isNotEmpty ? nomeTabela : (nomeAuth.isNotEmpty ? nomeAuth : 'Consultor');
 
       if (mounted) setState(() => _userName = _formatarNome(nomeEscolhido));
-    } catch (e) {
-      debugPrint('[perfil] erro ao carregar nome: $e');
+    } catch (_) {
       if (mounted) setState(() => _userName = 'Consultor');
     }
   }
@@ -187,7 +181,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
 
     return _client
         .from('clientes')
-        .select('id, estabelecimento, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t')
+        .select(
+            'id, estabelecimento, endereco, logradouro, numero, cidade, estado, data_visita, hora_visita, consultor_uid_t')
         .eq('consultor_uid_t', user.id)
         .order('data_visita', ascending: true)
         .asStream();
@@ -247,10 +242,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
       DateTime data = DateTime.parse(dataStr);
       if (horaStr != null && horaStr.isNotEmpty) {
         final parts = horaStr.split(':');
-        final h = int.tryParse(parts[0]) ?? 0;
-        final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
-        final s = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
-        data = DateTime(data.year, data.month, data.day, h, m, s);
+        int parsePart(int idx) => (idx < parts.length) ? int.tryParse(parts[idx]) ?? 0 : 0;
+        data = DateTime(data.year, data.month, data.day, parsePart(0), parsePart(1), parsePart(2));
         return DateFormat('HH:mm').format(data);
       }
       final embutida = DateFormat('HH:mm').format(data);
@@ -258,6 +251,40 @@ class _HomeConsultorState extends State<HomeConsultor> {
     } catch (_) {
       return '';
     }
+  }
+
+  DateTime _composeToday(DateTime data, String? hora) {
+    if (hora == null || hora.isEmpty) {
+      return DateTime(data.year, data.month, data.day);
+    }
+    final parts = hora.split(':');
+    int parsePart(int idx) => (idx < parts.length) ? int.tryParse(parts[idx]) ?? 0 : 0;
+    final h = parsePart(0);
+    final m = parsePart(1);
+    final s = parsePart(2);
+    return DateTime(data.year, data.month, data.day, h, m, s);
+  }
+
+  int _safeCompare(Map<String, dynamic> a, Map<String, dynamic> b) {
+    DateTime? parseDate(Map<String, dynamic> r) {
+      final s = r['data_visita']?.toString();
+      if (s == null || s.isEmpty) return null;
+      try {
+        return DateTime.parse(s);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final da = parseDate(a);
+    final db = parseDate(b);
+    if (da == null && db == null) return 0;
+    if (da == null) return 1;
+    if (db == null) return -1;
+
+    final ta = _composeToday(da, a['hora_visita']?.toString());
+    final tb = _composeToday(db, b['hora_visita']?.toString());
+    return ta.compareTo(tb);
   }
 
   Widget _buildRuaTrabalhoHoje() {
@@ -271,47 +298,55 @@ class _HomeConsultorState extends State<HomeConsultor> {
         }
 
         if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildRuaTrabalhoPlaceholder(cs, 'Nenhuma visita hoje', 'Cadastre clientes para ver as visitas aqui');
+          return _buildRuaTrabalhoPlaceholder(
+              cs, 'Nenhuma visita hoje', 'Cadastre clientes para ver as visitas aqui');
         }
 
         final lista = snapshot.data!;
         final now = DateTime.now();
         final hoje = DateTime(now.year, now.month, now.day);
 
-        Map<String, dynamic>? clienteHoje;
-
-        for (final data in lista) {
-          final s = data['data_visita']?.toString();
+        final deHoje = <Map<String, dynamic>>[];
+        for (final row in lista) {
+          final s = row['data_visita']?.toString();
           if (s == null || s.isEmpty) continue;
           try {
             final dt = DateTime.parse(s);
             final d = DateTime(dt.year, dt.month, dt.day);
-            if (d == hoje) {
-              clienteHoje = data;
-              break;
-            }
+            if (d == hoje) deHoje.add(row);
           } catch (_) {}
         }
 
-        if (clienteHoje == null) {
+        if (deHoje.isEmpty) {
           return _buildRuaTrabalhoPlaceholder(cs, 'Nenhuma visita para hoje', 'As visitas de hoje aparecerão aqui');
         }
 
-        final estabelecimento = (clienteHoje['estabelecimento'] as String?) ?? 'Estabelecimento';
-        final endereco = (clienteHoje['endereco'] as String?) ?? 'Endereço';
-        final cidade = (clienteHoje['cidade'] as String?) ?? '';
-        final estado = (clienteHoje['estado'] as String?) ?? '';
+        deHoje.sort(_safeCompare);
+        final clienteHoje = deHoje.first;
+
+        final estabelecimento =
+            (clienteHoje['estabelecimento'] as String?)?.trim() ?? 'Estabelecimento';
+        final tipoAbrev = (clienteHoje['logradouro'] as String?)?.trim() ?? '';
+        final nomeVia = (clienteHoje['endereco'] as String?)?.trim() ?? '';
+        final numero = (clienteHoje['numero']?.toString() ?? '').trim();
+        final cidade = (clienteHoje['cidade'] as String?)?.trim() ?? '';
+        final estado = (clienteHoje['estado'] as String?)?.trim() ?? '';
         final horaHHmm = _formatHoraHoje(clienteHoje);
 
         final enderecoCompleto = [
-          if ((endereco).isNotEmpty) endereco,
+          [if (tipoAbrev.isNotEmpty) tipoAbrev, if (nomeVia.isNotEmpty) nomeVia]
+              .where((e) => e.isNotEmpty)
+              .join(' '),
+          if (numero.isNotEmpty) numero,
           if (cidade.isNotEmpty || estado.isNotEmpty) '$cidade - $estado',
         ].where((e) => e.isNotEmpty).join(', ');
 
-        final tituloLinha = horaHHmm.isNotEmpty ? 'HOJE $horaHHmm - $estabelecimento' : 'HOJE - $estabelecimento';
+        final tituloLinha =
+            horaHHmm.isNotEmpty ? 'HOJE $horaHHmm - $estabelecimento' : 'HOJE - $estabelecimento';
 
         return GestureDetector(
           onTap: () => _abrirNoGoogleMaps(enderecoCompleto),
+          onLongPress: () => _copiarEndereco(enderecoCompleto),
           child: _buildRuaTrabalhoReal(cs, tituloLinha, enderecoCompleto),
         );
       },
@@ -331,7 +366,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
           Container(
             width: 32,
             height: 32,
-            decoration: BoxDecoration(color: cs.surfaceVariant, borderRadius: BorderRadius.circular(8)),
+            decoration:
+                BoxDecoration(color: cs.surfaceVariant, borderRadius: BorderRadius.circular(8)),
             child: Icon(Icons.info_outline, color: cs.onSurfaceVariant, size: 18),
           ),
           const SizedBox(width: 10),

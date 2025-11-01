@@ -13,6 +13,8 @@ const _kPrimary = Color(0xFF0B5EA8);
 const _kSuccess = Color(0xFF2E7D32);
 const _kInfo = Color(0xFF1565C0);
 const _kAccent = Color(0xFF4F46E5);
+const _kWarn = Color(0xFFF57C00);
+const _kDanger = Color(0xFFD32F2F);
 
 final DateFormat _fmtHora = DateFormat('HH:mm');
 final DateFormat _fmtA = DateFormat('EEE, d MMM', 'pt_BR');
@@ -24,7 +26,7 @@ class VisitVM {
   final String enderecoCompleto;
   final String dataFmt;
   final IconData icone;
-  final String statusTxt;
+  final String statusTxt; 
   final Color corFundo;
   final Color corTexto;
   final String? negociacaoRaw;
@@ -192,10 +194,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       DateTime d = DateTime.parse(dataVisitaStr).toLocal();
       if (horaVisitaStr != null && horaVisitaStr.isNotEmpty) {
         final p = horaVisitaStr.split(':');
-        final h = int.tryParse(p[0]) ?? 0;
-        final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
-        final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
-        d = DateTime(d.year, d.month, d.day, h, m, s);
+        int part(int i) => (i < p.length) ? int.tryParse(p[i]) ?? 0 : 0;
+        d = DateTime(d.year, d.month, d.day, part(0), part(1), part(2));
       } else {
         d = DateTime(d.year, d.month, d.day, 23, 59, 59);
       }
@@ -236,49 +236,57 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
   }
 
   Map<String, dynamic> _statusNegociacaoChip(String? raw) {
-    final s = ((raw == null || raw.trim().isEmpty) ? 'novo' : raw.trim()).toLowerCase();
+    final s0 = (raw ?? '').trim().toLowerCase();
+    final s = s0
+        .replaceAll('ê', 'e')
+        .replaceAll('é', 'e')
+        .replaceAll('ç', 'c')
+        .replaceAll('ã', 'a')
+        .replaceAll('á', 'a')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('  ', ' ')
+        .trim();
 
-    IconData ic = Icons.info_outline;
-    Color fg = _kText;
-    Color bg = _kText.withOpacity(.08);
-    String txt = 'Sem status';
-
-    switch (s) {
-      case 'novo':
-        ic = Icons.fiber_new_outlined;
-        fg = _kInfo;
-        bg = _kInfo.withOpacity(.10);
-        txt = 'Novo';
-        break;
-      case 'em_negociacao':
-      case 'em negociação':
-        ic = Icons.handshake_outlined;
-        fg = _kAccent;
-        bg = _kAccent.withOpacity(.10);
-        txt = 'Em negociação';
-        break;
-      case 'proposta_enviada':
-      case 'proposta enviada':
-        ic = Icons.mark_email_read_outlined;
-        fg = _kPrimary;
-        bg = _kPrimary.withOpacity(.10);
-        txt = 'Proposta enviada';
-        break;
-      case 'fechado':
-      case 'venda':
-        ic = Icons.check_circle_outline;
-        fg = _kSuccess;
-        bg = _kSuccess.withOpacity(.10);
-        txt = 'Fechado';
-        break;
-      case 'perdido':
-        ic = Icons.cancel_outlined;
-        fg = const Color(0xFFD32F2F);
-        bg = const Color(0x1AD32F2F).withOpacity(.10);
-        txt = 'Perdido';
-        break;
+    if (s == 'conexao' || s == 'novo' || s == 'inicial') {
+      return {
+        'icone': Icons.link_outlined,
+        'texto': 'Conexão',
+        'corFundo': _kInfo.withOpacity(.10),
+        'corTexto': _kInfo,
+      };
     }
-    return {'icone': ic, 'texto': txt, 'corFundo': bg, 'corTexto': fg};
+    if (s == 'negociacao' || s == 'em negociacao' || s == 'proposta enviada' || s == 'proposta_enviada' || s == 'em andamento') {
+      return {
+        'icone': Icons.handshake_outlined,
+        'texto': 'Negociação',
+        'corFundo': _kWarn.withOpacity(.12),
+        'corTexto': _kWarn,
+      };
+    }
+    if (s == 'fechada' || s == 'fechado' || s == 'venda') {
+      return {
+        'icone': Icons.check_circle_outline,
+        'texto': 'Fechada',
+        'corFundo': _kSuccess.withOpacity(.12),
+        'corTexto': _kSuccess,
+      };
+    }
+    if (s == 'perdido' || s == 'perda') {
+      return {
+        'icone': Icons.cancel_outlined,
+        'texto': 'Perdido',
+        'corFundo': _kDanger.withOpacity(.12),
+        'corTexto': _kDanger,
+      };
+    }
+    return {
+      'icone': Icons.info_outline,
+      'texto': 'Sem status',
+      'corFundo': _kText.withOpacity(.08),
+      'corTexto': _kText,
+    };
   }
 
   String _capitalize(String text) => text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
@@ -390,13 +398,10 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
       padding: const EdgeInsets.only(top: 10),
       child: SizedBox(
         height: 160,
-        child: Scrollbar(
-          thumbVisibility: true,
-          child: ListView.builder(
-            padding: EdgeInsets.zero,
-            itemCount: visiveis.length,
-            itemBuilder: (context, index) => Padding(padding: const EdgeInsets.only(bottom: 8), child: buildChip(visiveis[index])),
-          ),
+        child: ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: visiveis.length,
+          itemBuilder: (context, index) => Padding(padding: const EdgeInsets.only(bottom: 8), child: buildChip(visiveis[index])),
         ),
       ),
     );
@@ -473,10 +478,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     if (d != null) {
       if (hs.isNotEmpty) {
         final p = hs.split(':');
-        final h = int.tryParse(p[0]) ?? 0;
-        final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
-        final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
-        d = DateTime(d.year, d.month, d.day, h, m, s);
+        int part(int i) => (i < p.length) ? int.tryParse(p[i]) ?? 0 : 0;
+        d = DateTime(d.year, d.month, d.day, part(0), part(1), part(2));
       } else {
         d = DateTime(d.year, d.month, d.day, 23, 59, 59);
       }
@@ -516,9 +519,24 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     );
   }
 
-  Widget _buildVisitaVM(VisitVM vm, {bool mostrarRota = true}) {
-    final sn = _statusNegociacaoChip(vm.negociacaoRaw);
+  Widget _chipNegociacaoReadonly(VisitVM vm) {
+    final m = _statusNegociacaoChip(vm.negociacaoRaw);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: m['corFundo'] as Color,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: (m['corTexto'] as Color).withOpacity(.25)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(m['icone'] as IconData, size: 14, color: m['corTexto'] as Color),
+        const SizedBox(width: 6),
+        Text(m['texto'] as String, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: m['corTexto'] as Color)),
+      ]),
+    );
+  }
 
+  Widget _buildVisitaVM(VisitVM vm, {bool mostrarRota = true}) {
     return _cleanCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -544,19 +562,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                 ]),
               ),
               const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: sn['corFundo'] as Color,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: (sn['corTexto'] as Color).withOpacity(.25)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(sn['icone'] as IconData, size: 14, color: sn['corTexto'] as Color),
-                  const SizedBox(width: 6),
-                  Text(sn['texto'] as String, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: sn['corTexto'] as Color)),
-                ]),
-              ),
+              _chipNegociacaoReadonly(vm),
             ],
           ),
           if (vm.enderecoCompleto.isNotEmpty) ...[
@@ -626,7 +632,6 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
           return _errorBox('Erro: ${snap.error}');
         }
 
-        // sempre resetar para refletir mudanças
         _cacheProximas = null;
         _cacheFinalizados = null;
 
@@ -649,10 +654,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
           if (data != null) {
             if (hs != null && hs.isNotEmpty) {
               final p = hs.split(':');
-              final h = int.tryParse(p[0]) ?? 0;
-              final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
-              final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
-              data = DateTime(data.year, data.month, data.day, h, m, s);
+              int part(int i) => (i < p.length) ? int.tryParse(p[i]) ?? 0 : 0;
+              data = DateTime(data.year, data.month, data.day, part(0), part(1), part(2));
             } else {
               data = DateTime(data.year, data.month, data.day, 23, 59, 59);
             }
@@ -839,12 +842,10 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                       ],
                     );
                   }
-
                   if (snapshot.hasError) {
                     return _errorBox('Erro: ${snapshot.error}');
                   }
 
-                  // reset a cada emissão
                   _cacheProximas = null;
                   _cacheFinalizados = null;
 
@@ -872,10 +873,8 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
                       final hs = c['hora_visita']?.toString();
                       if (hs != null && hs.isNotEmpty) {
                         final p = hs.split(':');
-                        final h = int.tryParse(p[0]) ?? 0;
-                        final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
-                        final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
-                        d = DateTime(d.year, d.month, d.day, h, m, s);
+                        int part(int i) => (i < p.length) ? int.tryParse(p[i]) ?? 0 : 0;
+                        d = DateTime(d.year, d.month, d.day, part(0), part(1), part(2));
                       } else {
                         d = DateTime(d.year, d.month, d.day, 0, 0, 0);
                       }

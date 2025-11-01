@@ -25,7 +25,6 @@ class ClienteService {
   bool _initialized = false;
   bool _syncRunning = false;
 
-  // Emite número de registros enviados após uma sincronização bem sucedida
   final StreamController<int> _syncedCountController = StreamController<int>.broadcast();
   Stream<int> get onSyncedCount => _syncedCountController.stream;
 
@@ -56,7 +55,6 @@ class ClienteService {
       final becameOnline = wasOffline && current != ConnectivityResult.none;
       if (!becameOnline) return;
 
-      // Debounce pequeno para estabilizar rede (captivo, DNS etc.)
       await Future.delayed(const Duration(milliseconds: 700));
 
       if (!await _hasRealInternet()) return;
@@ -77,8 +75,7 @@ class ClienteService {
     final results = await Connectivity().checkConnectivity();
     if (results.contains(ConnectivityResult.none)) return false;
     try {
-      final lookup = await InternetAddress.lookup('one.one.one.one')
-          .timeout(const Duration(seconds: 3));
+      final lookup = await InternetAddress.lookup('one.one.one.one').timeout(const Duration(seconds: 3));
       return lookup.isNotEmpty;
     } catch (_) {
       return false;
@@ -94,9 +91,7 @@ class ClienteService {
       _clientes
         ..clear()
         ..addAll(list.map((e) => Cliente.fromJson(e as Map<String, dynamic>)));
-    } catch (e) {
-      print('ClienteService _loadFromCache erro: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _saveToCache() async {
@@ -122,13 +117,15 @@ class ClienteService {
     await _saveToCache();
 
     try {
-      await _client
+      final data = await _client
           .from('clientes')
-          .upsert(payload.toSupabaseMap(), onConflict: 'id')
+          .upsert(payload.toSupabaseMap(), onConflict: 'logradouro, numero', ignoreDuplicates: true)
           .select();
-      return true;
+      return !(data is List && data.isEmpty);
+    } on PostgrestException catch (e) {
+      await _enqueue('save', payload);
+      return false;
     } catch (e) {
-      print('ClienteService saveCliente upsert falhou: $e');
       await _enqueue('save', payload);
       return false;
     }
@@ -140,7 +137,6 @@ class ClienteService {
     try {
       await _client.from('clientes').delete().eq('id', id);
     } catch (e) {
-      print('ClienteService removeCliente delete falhou: $e');
       final stub = Cliente(
         id: id,
         nomeCliente: '',
@@ -149,6 +145,8 @@ class ClienteService {
         estado: '',
         cidade: '',
         endereco: '',
+        logradouro: '',
+        numero: null,
         dataVisita: DateTime.now(),
         consultorUid: '',
       );
@@ -175,15 +173,8 @@ class ClienteService {
 
   Future<bool> _trySyncOnce() async {
     final session = _client.auth.currentSession;
-    if (session == null || session.user == null) {
-      print('ClienteService sync: sem sessão, abortando');
-      return false;
-    }
-
-    if (!await _hasRealInternet()) {
-      print('ClienteService sync: sem internet real, abortando');
-      return false;
-    }
+    if (session == null || session.user == null) return false;
+    if (!await _hasRealInternet()) return false;
 
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_pendingKey);
@@ -194,7 +185,6 @@ class ClienteService {
       ops = jsonDecode(raw);
     } catch (e) {
       await prefs.remove(_pendingKey);
-      print('ClienteService sync: pending_ops corrompido, limpando. Erro: $e');
       return true;
     }
     if (ops.isEmpty) return true;
@@ -212,16 +202,15 @@ class ClienteService {
         if (tipo == 'save') {
           await _client
               .from('clientes')
-              .upsert(payload.toSupabaseMap(), onConflict: 'id')
+              .upsert(payload.toSupabaseMap(), onConflict: 'logradouro, numero', ignoreDuplicates: true)
               .select();
           enviadosAgora++;
         } else if (tipo == 'remove') {
           await _client.from('clientes').delete().eq('id', payload.id);
-          enviadosAgora++; // conta como operação sincronizada
+          enviadosAgora++;
         }
       } catch (e) {
         remain.add(op);
-        print('ClienteService sync item falhou: $e');
       }
     }
 
@@ -231,7 +220,6 @@ class ClienteService {
       await prefs.setString(_pendingKey, jsonEncode(remain));
     }
 
-    // Emite quantidade enviada para quem escuta (UI, main, Workmanager)
     if (enviadosAgora > 0) {
       _syncedCountController.add(enviadosAgora);
     }
@@ -239,6 +227,5 @@ class ClienteService {
     return remain.isEmpty;
   }
 
-  // API pública para acionar sincronização com backoff
   Future<void> syncPendingOperations() => _syncWithRetry();
 }

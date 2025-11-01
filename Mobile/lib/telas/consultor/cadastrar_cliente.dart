@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+
 import 'package:ademicon_app/models/cliente.dart';
 import 'package:ademicon_app/services/cliente_service.dart';
 import 'package:ademicon_app/services/notification_service.dart';
@@ -19,45 +20,31 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
   final _formKey = GlobalKey<FormState>();
   final _client = Supabase.instance.client;
 
-  // Dados principais
   final _nomeClienteCtrl = TextEditingController();
   final _telefoneCtrl = TextEditingController();
   final _nomeEstabelecimentoCtrl = TextEditingController();
 
-  // Localidade (topo da seção Endereço)
-  final _estadoCtrl = TextEditingController(); // UF
-  final _cidadeCtrl = TextEditingController(); // Cidade/Localidade
+  final _estadoCtrl = TextEditingController(); 
+  final _cidadeCtrl = TextEditingController();
 
-  // Endereço detalhado
   final _bairroCtrl = TextEditingController();
-  final _complementoCtrl = TextEditingController(); // OPCIONAL
+  final _complementoCtrl = TextEditingController(); 
 
-  // Separação de logradouro
-  String? _tipoLogradouro; // valor "cheio" (Rua, Avenida, ...)
-  final _nomeViaCtrl = TextEditingController(); // Nome da via obrigatório
-  final _numeroCtrl = TextEditingController(); // Número obrigatório
-  final _cepCtrl = TextEditingController(); // CEP obrigatório
+  String? _tipoLogradouro; 
+  final _nomeViaCtrl = TextEditingController(); 
+  final _numeroCtrl = TextEditingController(); 
+  final _cepCtrl = TextEditingController();   
 
-  // Mantém o campo "logradouro" completo que será salvo (ex.: "Av. Paraná")
-  final _logradouroCtrl = TextEditingController();
-
-  // Campo legado (não exibido; sincronizado) "Av. Paraná 123 (Ap 01)"
-  final _enderecoCtrl = TextEditingController();
-
-  // Negociação
-  String? _statusNegociacao; // 'conexao' | 'negociacao' | 'fechada'
+  String? _statusNegociacao;
   final _valorPropostaCtrl = TextEditingController();
   final _dataNegociacaoCtrl = TextEditingController();
   final _horaNegociacaoCtrl = TextEditingController();
 
-  // Visita (já existente)
   final _dataVisitaCtrl = TextEditingController();
   final _horaVisitaCtrl = TextEditingController();
 
-  // Observações
   final _observacoesCtrl = TextEditingController();
 
-  // Máscaras
   final _telefoneFormatter = MaskTextInputFormatter(
     mask: '(##) #####-####',
     filter: {"#": RegExp(r'\d')},
@@ -70,7 +57,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     type: MaskAutoCompletionType.lazy,
   );
 
-  // Abreviações e lista de tipos para o Dropdown
   final Map<String, String> _abbr = const {
     'Avenida': 'Av.',
     'Rua': 'R.',
@@ -87,14 +73,15 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     'Rua','Avenida','Alameda','Travessa','Rodovia','Estrada','Praça','Via','Largo'
   ];
 
-  // Opções do status (label -> value)
   final List<Map<String, String>> _statusOptions = const [
-    {'label': 'Conexão',    'value': 'conexao'},
-    {'label': 'Negociação', 'value': 'negociacao'},
-    {'label': 'Fechada',    'value': 'fechada'},
+    {'label': 'Conexão',   'value': 'conexao'},
+    {'label': 'Negociação','value': 'negociacao'},
+    {'label': 'Fechada',   'value': 'fechada'},
   ];
 
   bool _isLoading = false;
+
+  String _norm(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   @override
   void initState() {
@@ -103,29 +90,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     _horaVisitaCtrl.text = DateFormat('HH:mm').format(DateTime.now());
     _dataNegociacaoCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     _horaNegociacaoCtrl.text = DateFormat('HH:mm').format(DateTime.now());
-
-    void syncEndereco() {
-      final tipoCheio = (_tipoLogradouro ?? '').trim(); // ex.: "Avenida"
-      final tipo = _abbr[tipoCheio] ?? tipoCheio;       // ex.: "Av."
-      final nome = _nomeViaCtrl.text.trim();
-      final num = _numeroCtrl.text.trim();
-      final comp = _complementoCtrl.text.trim();
-
-      // Logradouro completo abreviado ("Av. Paraná")
-      final via = [tipo, nome].where((e) => e.isNotEmpty).join(' ');
-      _logradouroCtrl.text = via;
-
-      // Endereço legado ("Av. Paraná 123 (Ap 01)")
-      final partes = <String>[];
-      if (via.isNotEmpty) partes.add(via);
-      if (num.isNotEmpty) partes.add(num);
-      if (comp.isNotEmpty) partes.add('($comp)');
-      _enderecoCtrl.text = partes.join(' ');
-    }
-
-    _nomeViaCtrl.addListener(syncEndereco);
-    _numeroCtrl.addListener(syncEndereco);
-    _complementoCtrl.addListener(syncEndereco);
   }
 
   @override
@@ -140,8 +104,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     _nomeViaCtrl.dispose();
     _numeroCtrl.dispose();
     _cepCtrl.dispose();
-    _logradouroCtrl.dispose();
-    _enderecoCtrl.dispose();
     _valorPropostaCtrl.dispose();
     _dataNegociacaoCtrl.dispose();
     _horaNegociacaoCtrl.dispose();
@@ -160,12 +122,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       lastDate: DateTime(now.year + 1),
     );
     if (picked != null) {
-      // Decide qual campo está focado
-      if (_dataNegociacaoCtrl.selection.baseOffset >= 0) {
-        _dataNegociacaoCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
-      } else {
-        _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
-      }
+      _dataNegociacaoCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
     }
   }
 
@@ -175,13 +132,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       initialTime: TimeOfDay.now(),
     );
     if (picked != null) {
-      final formatted = picked.format(context);
-      // Decide qual campo está focado
-      if (_horaNegociacaoCtrl.selection.baseOffset >= 0) {
-        _horaNegociacaoCtrl.text = formatted;
-      } else {
-        _horaVisitaCtrl.text = formatted;
-      }
+      _horaNegociacaoCtrl.text = picked.format(context);
     }
   }
 
@@ -206,7 +157,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
   String? _validarValorProposta(String? v) {
     final raw = (v ?? '').trim();
-    if (raw.isEmpty) return null; // opcional
+    if (raw.isEmpty) return null;
     final norm = raw.replaceAll('.', '').replaceAll(',', '.');
     final parsed = num.tryParse(norm);
     if (parsed == null) return 'Valor inválido';
@@ -265,9 +216,21 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       final consultorNomeLocal = session.user!.email ?? 'Desconhecido';
 
       final tipoCheio = (_tipoLogradouro ?? '').trim();
-      final tipoAbreviado = _abbr[tipoCheio] ?? tipoCheio;
-      final nomeVia = _nomeViaCtrl.text.trim();
-      final logradouroCompleto = [tipoAbreviado, nomeVia].where((e) => e.isNotEmpty).join(' ');
+      final tipoAbreviado = _abbr[tipoCheio] ?? tipoCheio; // "Rua" ou "R."
+      final nomeVia = _norm(_nomeViaCtrl.text);
+
+      final logradouroTipo = tipoAbreviado; // apenas o tipo
+      final enderecoNome  = nomeVia;        // apenas o nome
+
+      final numeroStr = _numeroCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+      final int? numeroInt = numeroStr.isEmpty ? null : int.tryParse(numeroStr);
+      if (numeroInt == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Informe um número válido.')),
+        );
+        return;
+      }
 
       num? valorProposta;
       final rawValor = _valorPropostaCtrl.text.trim();
@@ -278,39 +241,38 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
       final cliente = Cliente(
         id: const Uuid().v4(),
-        nomeCliente: _nomeClienteCtrl.text.trim(),
+        nomeCliente: _norm(_nomeClienteCtrl.text),
         telefone: _telefoneCtrl.text.replaceAll(RegExp(r'[^\d]'), ''),
-        estabelecimento: _nomeEstabelecimentoCtrl.text.trim(),
+        estabelecimento: _norm(_nomeEstabelecimentoCtrl.text),
         estado: _estadoCtrl.text.trim().toUpperCase(),
-        cidade: _cidadeCtrl.text.trim(),
-        endereco: _enderecoCtrl.text.trim(),
-        logradouro: logradouroCompleto,
-        numero: _numeroCtrl.text.trim(),
-        complemento: _complementoCtrl.text.trim().isNotEmpty ? _complementoCtrl.text.trim() : null,
-        bairro: _bairroCtrl.text.trim(),
+        cidade: _norm(_cidadeCtrl.text),
+        endereco: enderecoNome,          // "Tiradentes"
+        logradouro: logradouroTipo,      // "Av." ou "R."
+        numero: numeroInt,               // int
+        complemento: _complementoCtrl.text.trim().isEmpty ? null : _norm(_complementoCtrl.text),
+        bairro: _norm(_bairroCtrl.text),
         cep: _cepCtrl.text.replaceAll(RegExp(r'[^\d]'), ''),
         dataVisita: dataHora,
-        observacoes: _observacoesCtrl.text.trim().isNotEmpty ? _observacoesCtrl.text.trim() : null,
+        observacoes: _observacoesCtrl.text.trim().isEmpty ? null : _norm(_observacoesCtrl.text),
         consultorResponsavel: consultorNomeLocal,
         consultorUid: userId,
         horaVisita: horaStr,
-        statusNegociacao: _statusNegociacao, // 'conexao' | 'negociacao' | 'fechada'
+        statusNegociacao: _statusNegociacao,
         valorProposta: valorProposta,
-        // Se quiser persistir data/hora da negociação, adicione no modelo e aqui:
-        // dataNegociacao: _dataNegociacaoCtrl.text.trim(),
-        // horaNegociacao: _horaNegociacaoCtrl.text.trim(),
       );
 
       final persistedNow = await ClienteService.instance.saveCliente(cliente);
 
       if (!mounted) return;
-      _limparCampos();
-      widget.onClienteCadastrado?.call();
 
       if (persistedNow) {
         await NotificationService.showSuccessNotification();
+        widget.onClienteCadastrado?.call();
+        _limparCampos();
       } else {
-        await NotificationService.showOfflineNotification();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Endereço já cadastrado (tipo + número).')),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -322,6 +284,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
   void _limparCampos() {
     _formKey.currentState?.reset();
+
     _nomeClienteCtrl.clear();
     _telefoneCtrl.clear();
     _nomeEstabelecimentoCtrl.clear();
@@ -332,20 +295,27 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
     _nomeViaCtrl.clear();
     _numeroCtrl.clear();
     _cepCtrl.clear();
-    _logradouroCtrl.clear();
-    _enderecoCtrl.clear();
     _valorPropostaCtrl.clear();
+    _observacoesCtrl.clear();
+
+    _tipoLogradouro = null;
     _statusNegociacao = null;
+
     _dataNegociacaoCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     _horaNegociacaoCtrl.text = DateFormat('HH:mm').format(DateTime.now());
-    _observacoesCtrl.clear();
-    _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
-    _horaVisitaCtrl.text = DateFormat('HH:mm').format(DateTime.now());
+    _dataVisitaCtrl.text      = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    _horaVisitaCtrl.text      = DateFormat('HH:mm').format(DateTime.now());
+
+    FocusScope.of(context).unfocus();
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.of(context).size.width <= 420;
+    final dropItemHeight = isNarrow ? 52.0 : 40.0;
+    final dropMenuMax = isNarrow ? 360.0 : 300.0;
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async => _limparCampos(),
@@ -464,9 +434,87 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             Row(
                               children: [
                                 Expanded(
+                                  flex: 2,
+                                  child: DropdownButtonFormField<String>(
+                                    isExpanded: true,
+                                    value: _tipoLogradouro,
+                                    items: _tiposLogradouro.map((e) {
+                                      return DropdownMenuItem<String>(
+                                        value: e,
+                                        child: SizedBox(
+                                          height: dropItemHeight,
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              e,
+                                              style: TextStyle(fontSize: isNarrow ? 16 : 14, fontWeight: FontWeight.w500),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    selectedItemBuilder: (context) {
+                                      return _tiposLogradouro.map((e) {
+                                        final abreviado = _abbr[e] ?? e;
+                                        return Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            isNarrow ? e : abreviado,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: isNarrow ? 16 : 14, fontWeight: FontWeight.w600),
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
+                                    onChanged: (v) => setState(() => _tipoLogradouro = v),
+                                    decoration: _obterDecoracaoCampo('Tipo').copyWith(
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: isNarrow ? 18 : 12),
+                                      isDense: !isNarrow,
+                                    ),
+                                    validator: (v) => v == null || v.isEmpty ? 'Tipo é obrigatório' : null,
+                                    menuMaxHeight: dropMenuMax,
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 4,
+                                  child: TextFormField(
+                                    controller: _nomeViaCtrl,
+                                    decoration: _obterDecoracaoCampo('Nome da via', hint: 'Ex: Tiradentes').copyWith(
+                                      isDense: !isNarrow,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: isNarrow ? 18 : 12),
+                                      // Não exibir o Tipo dentro do campo
+                                      prefixIcon: null,
+                                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                                    ),
+                                    validator: (v) => _validarCampoObrigatorio(v, field: 'Nome da via'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: TextFormField(
+                                    controller: _numeroCtrl,
+                                    keyboardType: TextInputType.number,
+                                    decoration: _obterDecoracaoCampo('Número', hint: '123').copyWith(
+                                      isDense: !isNarrow,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: isNarrow ? 18 : 12),
+                                    ),
+                                    validator: (v) => _validarCampoObrigatorio(v, field: 'Número'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            Row(
+                              children: [
+                                Expanded(
                                   child: TextFormField(
                                     controller: _bairroCtrl,
-                                    decoration: _obterDecoracaoCampo('Bairro', hint: 'Jardim x').copyWith(isDense: true),
+                                    decoration: _obterDecoracaoCampo('Bairro', hint: 'Ex: Centro').copyWith(isDense: true),
                                     validator: (v) => _validarCampoObrigatorio(v, field: 'Bairro'),
                                   ),
                                 ),
@@ -481,60 +529,11 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             ),
                             const SizedBox(height: 12),
 
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: DropdownButtonFormField<String>(
-                                    isExpanded: true,
-                                    value: _tipoLogradouro,
-                                    items: _tiposLogradouro
-                                        .map((e) => DropdownMenuItem(
-                                              value: e,
-                                              child: Text(e, overflow: TextOverflow.ellipsis),
-                                            ))
-                                        .toList(),
-                                    selectedItemBuilder: (context) {
-                                      return _tiposLogradouro.map((e) {
-                                        final abreviado = _abbr[e] ?? e;
-                                        return Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(abreviado, overflow: TextOverflow.ellipsis),
-                                        );
-                                      }).toList();
-                                    },
-                                    onChanged: (v) => setState(() => _tipoLogradouro = v),
-                                    decoration: _obterDecoracaoCampo('Tipo').copyWith(isDense: true),
-                                    validator: (v) => v == null || v.isEmpty ? 'Tipo é obrigatório' : null,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 4,
-                                  child: TextFormField(
-                                    controller: _nomeViaCtrl,
-                                    decoration: _obterDecoracaoCampo('Nome da via', hint: 'Ex: Paraná').copyWith(isDense: true),
-                                    validator: (v) => _validarCampoObrigatorio(v, field: 'Nome da via'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 2,
-                                  child: TextFormField(
-                                    controller: _numeroCtrl,
-                                    decoration: _obterDecoracaoCampo('Número', hint: '123').copyWith(isDense: true),
-                                    validator: (v) => _validarCampoObrigatorio(v, field: 'Número'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-
                             TextFormField(
                               controller: _cepCtrl,
                               keyboardType: TextInputType.number,
                               inputFormatters: [_cepFormatter],
-                              decoration: _obterDecoracaoCampo('CEP (Código de Endereçamento Postal)', hint: '00000-000').copyWith(isDense: true),
+                              decoration: _obterDecoracaoCampo('CEP', hint: '00000-000').copyWith(isDense: true),
                               validator: _validarCEP,
                             ),
 
@@ -546,7 +545,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             ),
                             const SizedBox(height: 12),
 
-                            // Data e Hora da negociação
                             Row(
                               children: [
                                 Expanded(
@@ -584,7 +582,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             ),
                             const SizedBox(height: 12),
 
-                            // Status e Valor da proposta
                             Row(
                               children: [
                                 Expanded(
@@ -627,7 +624,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                               controller: _observacoesCtrl,
                               maxLines: 3,
                               decoration: InputDecoration(
-                                hintText: 'Ex: cliente solicitou entrega no horário da tarde',
+                                hintText: 'Ex: cliente solicitou entrega no período da tarde',
                                 filled: true,
                                 fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -649,11 +646,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                                   child: FilledButton(
                                     onPressed: _isLoading ? null : _salvarCliente,
                                     child: _isLoading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
+                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                                         : const Text('Cadastrar'),
                                   ),
                                 ),

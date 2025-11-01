@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 class MeusClientesTab extends StatefulWidget {
   final Function onClienteRemovido;
-
   const MeusClientesTab({super.key, required this.onClienteRemovido});
 
   @override
@@ -16,7 +15,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
   String _query = '';
   final SupabaseClient _client = Supabase.instance.client;
 
-  // Abreviações e tipos de logradouro
   final Map<String, String> _abbr = const {
     'Avenida': 'Av.',
     'Rua': 'R.',
@@ -33,9 +31,9 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
   ];
 
   final List<Map<String, String>> _statusOptions = const [
-    {'label': 'Conexão',    'value': 'conexao'},
+    {'label': 'Conexão', 'value': 'conexao'},
     {'label': 'Negociação', 'value': 'negociacao'},
-    {'label': 'Fechada',    'value': 'fechada'},
+    {'label': 'Fechada', 'value': 'fechada'},
   ];
 
   @override
@@ -52,14 +50,12 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
   Stream<List<Map<String, dynamic>>> get _meusClientesStream {
     final user = _client.auth.currentSession?.user;
-    if (user == null) {
-      return const Stream<List<Map<String, dynamic>>>.empty();
-    }
+    if (user == null) return const Stream<List<Map<String, dynamic>>>.empty();
     return _client
         .from('clientes')
         .select('*')
         .eq('consultor_uid_t', user.id)
-        .order('data_visita', ascending: true)
+        .order('data_visita', ascending: true, nullsFirst: false)
         .asStream();
   }
 
@@ -78,27 +74,19 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
   String _statusLabel(String? v) {
     switch ((v ?? '').toLowerCase()) {
-      case 'conexao':
-        return 'Conexão';
-      case 'negociacao':
-        return 'Negociação';
-      case 'fechada':
-        return 'Fechada';
-      default:
-        return '—';
+      case 'conexao': return 'Conexão';
+      case 'negociacao': return 'Negociação';
+      case 'fechada': return 'Fechada';
+      default: return '—';
     }
   }
 
   Color _statusColor(String? v) {
     switch ((v ?? '').toLowerCase()) {
-      case 'conexao':
-        return Colors.blue;
-      case 'negociacao':
-        return Colors.orange;
-      case 'fechada':
-        return Colors.green;
-      default:
-        return Colors.grey;
+      case 'conexao': return Colors.blue;
+      case 'negociacao': return Colors.orange;
+      case 'fechada': return Colors.green;
+      default: return Colors.grey;
     }
   }
 
@@ -114,7 +102,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
               child: TextField(
                 controller: _searchCtrl,
                 textInputAction: TextInputAction.search,
-                decoration: _obterDecoracaoCampo(
+                decoration: _decoracaoCampo(
                   context,
                   'Buscar clientes',
                   hint: 'Digite nome, endereço, bairro, cidade ou status...',
@@ -140,22 +128,30 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
               final clientes = snapshot.data!;
               final q = _query.toLowerCase();
-              final clientesFiltrados = _query.isEmpty
-                  ? clientes
-                  : clientes.where((c) {
-                      final estabelecimento = (c['estabelecimento']?.toString().toLowerCase() ?? '');
-                      final endereco = (c['endereco']?.toString().toLowerCase() ?? '');
-                      final bairro = (c['bairro']?.toString().toLowerCase() ?? '');
-                      final cidade = (c['cidade']?.toString().toLowerCase() ?? '');
-                      final status = (c['status_negociacao']?.toString().toLowerCase() ?? '');
-                      final valor = (c['valor_proposta']?.toString().toLowerCase() ?? '');
-                      return estabelecimento.contains(q) ||
-                          endereco.contains(q) ||
-                          bairro.contains(q) ||
-                          cidade.contains(q) ||
-                          status.contains(q) ||
-                          valor.contains(q);
-                    }).toList();
+
+              List<Map<String, dynamic>> clientesFiltrados;
+              if (_query.isEmpty) {
+                clientesFiltrados = clientes;
+              } else {
+                String s(Object? x) => (x ?? '').toString().toLowerCase();
+                clientesFiltrados = clientes.where((c) {
+                  final estabelecimento = s(c['estabelecimento'].toString().isNotEmpty ? c['estabelecimento'] : c['nome']);
+                  final logradouro = s(c['logradouro']); 
+                  final endereco = s(c['endereco']);   
+                  final numero = s(c['numero']);
+                  final bairro = s(c['bairro']);
+                  final cidade = s(c['cidade']);
+                  final status = s(c['status_negociacao']);
+                  final valor = s(c['valor_proposta']);
+                  return estabelecimento.contains(q) ||
+                         (logradouro + ' ' + endereco).contains(q) ||
+                         numero.contains(q) ||
+                         bairro.contains(q) ||
+                         cidade.contains(q) ||
+                         status.contains(q) ||
+                         valor.contains(q);
+                }).toList();
+              }
 
               if (clientesFiltrados.isEmpty) {
                 return SliverToBoxAdapter(
@@ -185,9 +181,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       ),
     );
   }
-
-  InputDecoration _obterDecoracaoCampo(BuildContext context, String label, {String? hint, Widget? suffixIcon}) =>
-      _decoracaoCampo(context, label, hint: hint, suffixIcon: suffixIcon);
 
   Widget _buildHeader() {
     return Padding(
@@ -238,31 +231,55 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     );
   }
 
+  DateTime? _parseVisita(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v.toLocal();
+    if (v is String) return DateTime.tryParse(v)?.toLocal();
+    if (v is Map && v['value'] is String) return DateTime.tryParse(v['value'])?.toLocal();
+    return null;
+  }
+
   Widget _buildClienteItem(Map<String, dynamic> c) {
-    final String estabelecimento = c['estabelecimento'] ?? 'Cliente';
-    final String endereco = '${c['endereco'] ?? ''}, ${c['bairro'] ?? ''}';
-    final String cidade = '${c['cidade'] ?? ''} - ${c['estado'] ?? ''}';
+    final String titulo = (c['estabelecimento'] ?? c['nome'] ?? 'Cliente').toString().trim();
 
-    final String? dataVisitaStr = c['data_visita'] as String?;
-    final DateTime? dataVisita = dataVisitaStr != null ? DateTime.tryParse(dataVisitaStr) : null;
+    final String tipoAbrev = (c['logradouro'] ?? '').toString().trim(); 
+    final String nomeVia = (c['endereco'] ?? '').toString().trim();    
+    final String numero = (c['numero'] ?? '').toString().trim();
+    final String complemento = (c['complemento'] ?? '').toString().trim();
+    final String bairro = (c['bairro'] ?? '').toString().trim();
 
-    final bool visitaPassada = dataVisita != null && dataVisita.isBefore(DateTime.now());
+    final String linhaEndereco = [
+      if (tipoAbrev.isNotEmpty) tipoAbrev,
+      if (nomeVia.isNotEmpty) nomeVia,
+      if (numero.isNotEmpty) numero,
+      if (complemento.isNotEmpty) '($complemento)',
+      if (bairro.isNotEmpty) '- $bairro',
+    ].join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    final String cidade = (c['cidade'] ?? '').toString().trim();
+    final String estado = (c['estado'] ?? '').toString().trim().toUpperCase();
+    final String linhaCidade = [cidade, estado].where((e) => e.isNotEmpty).join(' - ');
+
+    final DateTime? dataVisita = _parseVisita(c['data_visita']);
+    final now = DateTime.now();
     final bool visitaHoje = dataVisita != null &&
-        dataVisita.year == DateTime.now().year &&
-        dataVisita.month == DateTime.now().month &&
-        dataVisita.day == DateTime.now().day;
+        dataVisita.year == now.year && dataVisita.month == now.month && dataVisita.day == now.day;
+    final bool visitaPassada = dataVisita != null && dataVisita.isBefore(DateTime(now.year, now.month, now.day));
 
     String dataFormatada = 'Data não informada';
     if (dataVisita != null) {
-      final formatter = DateFormat('dd/MM/yyyy');
-      dataFormatada = 'Próxima visita: ${formatter.format(dataVisita)}';
+      dataFormatada = 'Próxima visita: ${DateFormat('dd/MM/yyyy').format(dataVisita)}';
     }
 
     final String statusTec = (c['status_negociacao'] ?? '').toString();
     final String statusLabel = _statusLabel(statusTec);
     final Color statusColor = _statusColor(statusTec);
-    final num? valorProposta = c['valor_proposta'] as num?;
-    final String valorFmt = valorProposta != null ? NumberFormat.simpleCurrency(locale: 'pt_BR').format(valorProposta) : '—';
+    final num? valorProposta = c['valor_proposta'] is num
+        ? c['valor_proposta'] as num
+        : num.tryParse((c['valor_proposta'] ?? '').toString());
+    final String valorFmt = valorProposta != null
+        ? NumberFormat.simpleCurrency(locale: 'pt_BR').format(valorProposta)
+        : '—';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -295,10 +312,12 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(estabelecimento, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     const SizedBox(height: 4),
-                    Text(endereco, style: Theme.of(context).textTheme.bodySmall),
-                    Text(cidade, style: Theme.of(context).textTheme.bodySmall),
+                    if (linhaEndereco.isNotEmpty)
+                      Text(linhaEndereco, style: Theme.of(context).textTheme.bodySmall),
+                    if (linhaCidade.isNotEmpty)
+                      Text(linhaCidade, style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 12,
@@ -309,8 +328,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           label: Text(statusLabel),
                           backgroundColor: statusColor.withOpacity(0.1),
                           labelStyle: TextStyle(color: statusColor, fontWeight: FontWeight.w600),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                         Text(
                           'Proposta: $valorFmt',
@@ -343,7 +360,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Confirmar exclusão'),
-                      content: Text('Tem certeza que deseja excluir $estabelecimento?'),
+                      content: Text('Tem certeza que deseja excluir $titulo?'),
                       actions: [
                         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
                         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Excluir', style: TextStyle(color: Colors.red))),
@@ -379,7 +396,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
   Future<void> _editarCliente(Map<String, dynamic> c) async {
     final formKey = GlobalKey<FormState>();
 
-    // Controllers pré-preenchidos
     final statusTec = (c['status_negociacao'] ?? '').toString();
     final valorProposta = (c['valor_proposta'] as num?)?.toString() ?? '';
     final bairro = (c['bairro'] ?? '').toString();
@@ -388,21 +404,15 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     final numero = (c['numero'] ?? '').toString();
     final complemento = (c['complemento'] ?? '').toString();
     final observacoes = (c['observacoes'] ?? '').toString();
+    final tipoInicial = _abbr.entries
+        .firstWhere(
+          (e) => (c['logradouro'] ?? '').toString().trim().toLowerCase() == e.value.toLowerCase(),
+          orElse: () => const MapEntry('', ''),
+        )
+        .key;
+    final nomeViaInicial = (c['endereco'] ?? '').toString().trim();
 
-    final logradouroAtual = (c['logradouro'] ?? '').toString(); // ex.: "Av. Paraná"
-    // Tenta separar tipo e nome a partir do logradouro salvo (abreviado)
-    String? tipoInicial;
-    String nomeViaInicial = logradouroAtual;
-    for (final entry in _abbr.entries) {
-      final ab = entry.value;
-      if (logradouroAtual.startsWith('$ab ')) {
-        tipoInicial = entry.key; // valor cheio para o dropdown
-        nomeViaInicial = logradouroAtual.substring(ab.length).trim();
-        break;
-      }
-    }
-
-    String? _tipoLogradouroEd = tipoInicial;
+    String? _tipoLogradouroEd = tipoInicial.isEmpty ? null : tipoInicial;
     final nomeViaCtrl = TextEditingController(text: nomeViaInicial);
     final numeroCtrl = TextEditingController(text: numero);
     final bairroCtrl = TextEditingController(text: bairro);
@@ -413,30 +423,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     final observacoesCtrl = TextEditingController(text: observacoes);
     String? _statusTecEd = statusTec.isEmpty ? null : statusTec;
 
-    String montarLogradouro(String? tipoCheio, String nomeVia) {
-      final ab = _abbr[tipoCheio ?? ''] ?? (tipoCheio ?? '');
-      return [ab, nomeVia.trim()].where((e) => e.isNotEmpty).join(' ');
-    }
-
-    String montarEnderecoLegado(String logradouro, String numero, String complemento) {
-      final partes = <String>[];
-      if (logradouro.isNotEmpty) partes.add(logradouro);
-      if (numero.trim().isNotEmpty) partes.add(numero.trim());
-      if (complemento.trim().isNotEmpty) partes.add('(${complemento.trim()})');
-      return partes.join(' ');
-    }
-
-    String? validarObrigatorio(String? v, String nome) => (v == null || v.trim().isEmpty) ? '$nome é obrigatório' : null;
-
-    String? validarValor(String? v) {
-      final raw = (v ?? '').trim();
-      if (raw.isEmpty) return null;
-      final norm = raw.replaceAll('.', '').replaceAll(',', '.');
-      final parsed = num.tryParse(norm);
-      if (parsed == null) return 'Valor inválido';
-      if (parsed < 0) return 'Valor não pode ser negativo';
-      return null;
-    }
+    String montarLogradouroAbrev(String? tipoCheio) => _abbr[tipoCheio ?? ''] ?? (tipoCheio ?? '');
 
     await showModalBottomSheet(
       context: context,
@@ -481,7 +468,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Status e Valor
                     Row(
                       children: [
                         Expanded(
@@ -493,7 +479,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                                 .map((s) => DropdownMenuItem<String>(value: s['value']!, child: Text(s['label']!)))
                                 .toList(),
                             onChanged: (v) => _statusTecEd = v,
-                            decoration: _obterDecoracaoCampo(context, 'Status'),
+                            decoration: _decoracaoCampo(context, 'Status'),
                             validator: (v) => v == null || v.isEmpty ? 'Status é obrigatório' : null,
                           ),
                         ),
@@ -503,22 +489,29 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           child: TextFormField(
                             controller: valorCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: _obterDecoracaoCampo(context, 'Valor da proposta', hint: 'Ex: 1500,00'),
-                            validator: validarValor,
+                            decoration: _decoracaoCampo(context, 'Valor da proposta', hint: 'Ex: 1500,00'),
+                            validator: (v) {
+                              final raw = (v ?? '').trim();
+                              if (raw.isEmpty) return null;
+                              final norm = raw.replaceAll('.', '').replaceAll(',', '.');
+                              final parsed = num.tryParse(norm);
+                              if (parsed == null) return 'Valor inválido';
+                              if (parsed < 0) return 'Valor não pode ser negativo';
+                              return null;
+                            },
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // Logradouro (Tipo + Nome) e Número
                     Row(
                       children: [
                         Expanded(
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             isExpanded: true,
-                            value: _tipoLogradouroEd,
+                            value: _tiposLogradouro.contains(_tipoLogradouroEd) ? _tipoLogradouroEd : null,
                             items: _tiposLogradouro.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                             selectedItemBuilder: (context) {
                               return _tiposLogradouro.map((e) {
@@ -526,8 +519,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                                 return Align(alignment: Alignment.centerLeft, child: Text(abreviado, overflow: TextOverflow.ellipsis));
                               }).toList();
                             },
-                            onChanged: (v) => _tipoLogradouroEd = v,
-                            decoration: _obterDecoracaoCampo(context, 'Tipo'),
+                            onChanged: (v) => setState(() => _tipoLogradouroEd = v),
+                            decoration: _decoracaoCampo(context, 'Tipo'),
                             validator: (v) => v == null || v.isEmpty ? 'Tipo é obrigatório' : null,
                           ),
                         ),
@@ -536,8 +529,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 4,
                           child: TextFormField(
                             controller: nomeViaCtrl,
-                            decoration: _obterDecoracaoCampo(context, 'Nome da via', hint: 'Ex: Paraná'),
-                            validator: (v) => validarObrigatorio(v, 'Nome da via'),
+                            decoration: _decoracaoCampo(context, 'Nome da via', hint: 'Ex: Tiradentes'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Nome da via é obrigatório' : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -545,30 +538,29 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 2,
                           child: TextFormField(
                             controller: numeroCtrl,
-                            decoration: _obterDecoracaoCampo(context, 'Número', hint: '123'),
-                            validator: (v) => validarObrigatorio(v, 'Número'),
+                            decoration: _decoracaoCampo(context, 'Número', hint: '123'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Número é obrigatório' : null,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // Bairro e Cidade/Estado
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             controller: bairroCtrl,
-                            decoration: _obterDecoracaoCampo(context, 'Bairro', hint: 'Jardim ...'),
-                            validator: (v) => validarObrigatorio(v, 'Bairro'),
+                            decoration: _decoracaoCampo(context, 'Bairro', hint: 'Jardim ...'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Bairro é obrigatório' : null,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(
                             controller: cidadeCtrl,
-                            decoration: _obterDecoracaoCampo(context, 'Cidade', hint: 'Londrina'),
-                            validator: (v) => validarObrigatorio(v, 'Cidade'),
+                            decoration: _decoracaoCampo(context, 'Cidade', hint: 'Londrina'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Cidade é obrigatório' : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -577,7 +569,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           child: TextFormField(
                             controller: estadoCtrl,
                             textCapitalization: TextCapitalization.characters,
-                            decoration: _obterDecoracaoCampo(context, 'UF', hint: 'PR'),
+                            decoration: _decoracaoCampo(context, 'UF', hint: 'PR'),
                             validator: (v) {
                               final x = v?.trim().toUpperCase() ?? '';
                               if (x.isEmpty) return 'UF é obrigatório';
@@ -590,18 +582,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Complemento
                     TextFormField(
                       controller: complementoCtrl,
-                      decoration: _obterDecoracaoCampo(context, 'Complemento', hint: 'Ap, bloco, casa, sala'),
+                      decoration: _decoracaoCampo(context, 'Complemento', hint: 'Ap, bloco, casa, sala'),
                     ),
                     const SizedBox(height: 12),
 
-                    // Observações
                     TextFormField(
                       controller: observacoesCtrl,
                       maxLines: 3,
-                      decoration: _obterDecoracaoCampo(context, 'Observações', hint: 'Notas sobre a negociação'),
+                      decoration: _decoracaoCampo(context, 'Observações', hint: 'Notas sobre a negociação'),
                     ),
 
                     const SizedBox(height: 16),
@@ -611,7 +601,6 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                         onPressed: () async {
                           if (!(formKey.currentState?.validate() ?? false)) return;
 
-                          // normaliza valor
                           num? valor;
                           final raw = valorCtrl.text.trim();
                           if (raw.isNotEmpty) {
@@ -619,21 +608,34 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                             valor = num.tryParse(norm);
                           }
 
-                          final logradouroNovo = montarLogradouro(_tipoLogradouroEd, nomeViaCtrl.text);
-                          final enderecoLegado = montarEnderecoLegado(logradouroNovo, numeroCtrl.text, complementoCtrl.text);
+                          final nomeViaPuro = nomeViaCtrl.text.trim();
+                          if (_tipoLogradouroEd == null || _tipoLogradouroEd!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Selecione o Tipo (logradouro).'), backgroundColor: Colors.red),
+                            );
+                            return;
+                          }
+                          if (nomeViaPuro.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Informe o Nome da via.'), backgroundColor: Colors.red),
+                            );
+                            return;
+                          }
+
+                          final logradouroAbrev = montarLogradouroAbrev(_tipoLogradouroEd);
 
                           try {
                             await _client.from('clientes').update({
                               'status_negociacao': _statusTecEd,
                               'valor_proposta': valor,
-                              'logradouro': logradouroNovo,
+                              'logradouro': logradouroAbrev,  
+                              'endereco'  : nomeViaPuro,      
                               'numero': numeroCtrl.text.trim(),
                               'bairro': bairroCtrl.text.trim(),
                               'cidade': cidadeCtrl.text.trim(),
                               'estado': estadoCtrl.text.trim().toUpperCase(),
-                              'complemento': complementoCtrl.text.trim().isEmpty ? null : complementoCtrl.text.trim(),
-                              'endereco': enderecoLegado,
-                              'observacoes': observacoesCtrl.text.trim().isEmpty ? null : observacoesCtrl.text.trim(),
+                              'complemento': complementoCtrl.text.trim().isNotEmpty ? complementoCtrl.text.trim() : null,
+                              'observacoes': observacoesCtrl.text.trim().isNotEmpty ? observacoesCtrl.text.trim() : null,
                             }).eq('id', c['id']);
 
                             if (mounted) {
@@ -641,7 +643,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Cliente atualizado com sucesso'), backgroundColor: Colors.green),
                               );
-                              setState(() {}); // força rebuild para refletir mudanças no Stream
+                              setState(() {});
                             }
                           } catch (e) {
                             if (mounted) {

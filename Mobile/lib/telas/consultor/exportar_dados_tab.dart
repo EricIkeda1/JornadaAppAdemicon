@@ -1,4 +1,4 @@
-import 'dart:convert'; 
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -68,6 +68,7 @@ class ExportarDadosTab extends StatelessWidget {
   }
 
   Widget _buildExportCard(BuildContext context) {
+    final hasData = clientes.isNotEmpty;
     return Card(
       elevation: 3,
       shadowColor: Colors.black26,
@@ -106,9 +107,8 @@ class ExportarDadosTab extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: clientes.isEmpty
-                        ? null
-                        : () async {
+                    onPressed: hasData
+                        ? () async {
                             try {
                               final csv = _buildCsv(clientes);
                               final path = await _saveCsvToTemp(csv);
@@ -120,7 +120,8 @@ class ExportarDadosTab extends StatelessWidget {
                             } catch (e) {
                               _showSnack(context, 'Falha ao exportar: $e', color: Colors.red);
                             }
-                          },
+                          }
+                        : null,
                     icon: const Icon(Icons.download_rounded),
                     label: const Text('Baixar CSV'),
                     style: FilledButton.styleFrom(
@@ -131,9 +132,8 @@ class ExportarDadosTab extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: clientes.isEmpty
-                        ? null
-                        : () async {
+                    onPressed: hasData
+                        ? () async {
                             try {
                               final csv = _buildCsv(clientes);
                               await Clipboard.setData(ClipboardData(text: csv));
@@ -141,7 +141,8 @@ class ExportarDadosTab extends StatelessWidget {
                             } catch (e) {
                               _showSnack(context, 'Falha ao copiar: $e', color: Colors.red);
                             }
-                          },
+                          }
+                        : null,
                     icon: const Icon(Icons.copy_rounded),
                     label: const Text('Copiar'),
                     style: OutlinedButton.styleFrom(
@@ -151,7 +152,7 @@ class ExportarDadosTab extends StatelessWidget {
                 ),
               ],
             ),
-            if (clientes.isEmpty) ...[
+            if (!hasData) ...[
               const SizedBox(height: 12),
               Text(
                 'Adicione clientes para habilitar a exportação.',
@@ -268,7 +269,9 @@ class ExportarDadosTab extends StatelessWidget {
       'estabelecimento',
       'estado',
       'cidade',
-      'endereco',
+      'logradouro',
+      'endereco', 
+      'numero',
       'bairro',
       'cep',
       'data_visita',
@@ -288,7 +291,9 @@ class ExportarDadosTab extends StatelessWidget {
         c.estabelecimento,
         c.estado,
         c.cidade,
-        c.endereco,
+        c.logradouro ?? '',  
+        c.endereco,    
+        c.numero?.toString() ?? '',
         c.bairro ?? '',
         c.cep ?? '',
         c.dataVisita.toIso8601String(),
@@ -302,24 +307,21 @@ class ExportarDadosTab extends StatelessWidget {
     return buffer.toString();
   }
 
-  String _escapeCsv(String value) {
-    var v = value;
+  String _escapeCsv(Object? value) {
+    final v = (value ?? '').toString();
     final needsQuote = v.contains(',') || v.contains('\n') || v.contains('"');
-    if (v.contains('"')) {
-      v = v.replaceAll('"', '""');
-    }
-    return needsQuote ? '"$v"' : v;
+    final escaped = v.replaceAll('"', '""');
+    return needsQuote ? '"$escaped"' : escaped;
   }
 
   Future<String> _saveCsvToTemp(String csv) async {
     final dir = await getTemporaryDirectory();
     final safeName = 'clientes_export_${DateTime.now().millisecondsSinceEpoch}.csv';
     final file = File('${dir.path}/$safeName');
-
     await file.writeAsString(
       csv,
       encoding: utf8,
-      flush: true, 
+      flush: true,
     );
     return file.path;
   }
