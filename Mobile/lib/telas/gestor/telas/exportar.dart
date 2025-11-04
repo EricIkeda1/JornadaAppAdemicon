@@ -1,4 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ExportarPage extends StatefulWidget {
@@ -32,24 +38,18 @@ class _ExportarPageState extends State<ExportarPage> {
     _carregarResumo();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  // Busca UIDs dos consultores do meu time
   Future<List<String>> _uidsConsultoresDoMeuTime() async {
     final rows = await sb
         .from('consultores')
         .select('uid')
-        .eq('gestor_id', _gestorId);
+        .eq('gestor_id', _gestorId)
+        .eq('ativo', true);
     return (rows as List)
         .map((r) => r['uid'] as String?)
         .whereType<String>()
         .toList();
   }
 
-  // Query base filtrando apenas clientes do meu time
   Future<List<Map<String, dynamic>>> _baseClientesSelect() async {
     final consUids = await _uidsConsultoresDoMeuTime();
     if (consUids.isEmpty) return <Map<String, dynamic>>[];
@@ -57,7 +57,8 @@ class _ExportarPageState extends State<ExportarPage> {
     final rows = await sb
         .from('clientes')
         .select('id,nome,endereco,bairro,cidade,estado,cep,telefone,data_visita,observacoes,consultor_uid_t,hora_visita,responsavel')
-        .inFilter('consultor_uid_t', consUids);
+        .inFilter('consultor_uid_t', consUids)
+        .order('nome', ascending: true);
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
@@ -72,61 +73,75 @@ class _ExportarPageState extends State<ExportarPage> {
     }
   }
 
-  Future<void> _baixarCSV() async {
-    if (!mounted) return;
+  String _montarCsvClientes(List<Map<String, dynamic>> rows) {
+    final buffer = StringBuffer();
+    const header =
+        'id;nome;endereco;bairro;cidade;estado;cep;telefone;data_visita;observacoes;consultor_uid_t;hora_visita;responsavel';
+    buffer.writeln(header);
+
+    String esc(dynamic v) {
+      final s = (v ?? '').toString().replaceAll('\n', ' ').replaceAll(';', ',');
+      return '"$s"';
+    }
+
+    for (final r in rows) {
+      buffer.writeln([
+        esc(r['id']),
+        esc(r['nome']),
+        esc(r['endereco']),
+        esc(r['bairro']),
+        esc(r['cidade']),
+        esc(r['estado']),
+        esc(r['cep']),
+        esc(r['telefone']),
+        esc(r['data_visita']),
+        esc(r['observacoes']),
+        esc(r['consultor_uid_t']),
+        esc(r['hora_visita']),
+        esc(r['responsavel']),
+      ].join(';'));
+    }
+    return buffer.toString();
+  }
+
+  Future<File> _criarArquivoTemp(String csv, String filename) async {
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$filename');
+    await file.writeAsString(csv, encoding: utf8);
+    return file;
+  }
+
+  Future<void> _compartilharCSVAgora() async {
+    if (!mounted || _loadingCsv) return;
     setState(() => _loadingCsv = true);
     try {
       final rows = await _baseClientesSelect();
-      // Ordena por nome em memória para manter base igual ao contador
-      rows.sort((a, b) => ((a['nome'] ?? '') as String).toLowerCase().compareTo(((b['nome'] ?? '') as String).toLowerCase()));
-
-      final buffer = StringBuffer();
-      const header =
-          'id;nome;endereco;bairro;cidade;estado;cep;telefone;data_visita;observacoes;consultor_uid_t;hora_visita;responsavel';
-      buffer.writeln(header);
-
-      String esc(dynamic v) {
-        final s = (v ?? '').toString().replaceAll('\n', ' ').replaceAll(';', ',');
-        return '"$s"';
-      }
-
-      for (final r in rows) {
-        buffer.writeln([
-          esc(r['id']),
-          esc(r['nome']),
-          esc(r['endereco']),
-          esc(r['bairro']),
-          esc(r['cidade']),
-          esc(r['estado']),
-          esc(r['cep']),
-          esc(r['telefone']),
-          esc(r['data_visita']),
-          esc(r['observacoes']),
-          esc(r['consultor_uid_t']),
-          esc(r['hora_visita']),
-          esc(r['responsavel']),
-        ].join(';'));
-      }
-
+      final csv = _montarCsvClientes(rows);
       if (mounted) setState(() => _qtdClientes = rows.length);
 
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Pré-visualização CSV'),
-          content: SingleChildScrollView(child: Text(buffer.toString(), style: const TextStyle(fontSize: 12))),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))],
-        ),
-      );
+      if (kIsWeb) {
+        await Clipboard.setData(ClipboardData(text: csv));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV copiado (Web). Use Ctrl+V para colar.')),
+        );
+      } else {
+        final file = await _criarArquivoTemp(csv, 'clientes_time.csv');
+        await Share.shareXFiles([XFile(file.path)], text: 'Clientes do time (CSV)');
+      }
     } finally {
       if (mounted) setState(() => _loadingCsv = false);
     }
   }
 
-  void _copiarLink() {
+  Future<void> _copiarCSVParaClipboard() async {
+    final rows = await _baseClientesSelect();
+    final csv = _montarCsvClientes(rows);
+    await Clipboard.setData(ClipboardData(text: csv));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copiado para a área de transferência.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('CSV copiado para a área de transferência.')),
+    );
   }
 
   Widget _plainHeader() {
@@ -144,7 +159,7 @@ class _ExportarPageState extends State<ExportarPage> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Exportar Dados', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.5)),
             SizedBox(height: 4),
-            Text('Exporte seus clientes para planilhas.', style: TextStyle(fontSize: 13, color: Color(0x99000000))),
+            Text('Compartilhe seus clientes em CSV para Excel/Sheets/CRM.', style: TextStyle(fontSize: 13, color: Color(0x99000000))),
           ]),
         ),
       ],
@@ -157,6 +172,82 @@ class _ExportarPageState extends State<ExportarPage> {
         border: Border.all(color: border),
         boxShadow: const [BoxShadow(color: shadow, blurRadius: 8, offset: Offset(0, 2))],
       );
+
+  Widget _exportCardButtons(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final narrow = c.maxWidth < 320;
+
+        final shareBtn = Expanded(
+          flex: 5,
+          child: SizedBox(
+            height: 44,
+            child: Material(
+              color: red,
+              borderRadius: BorderRadius.circular(26),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(26),
+                onTap: _loadingCsv ? null : _compartilharCSVAgora,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.ios_share_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _loadingCsv ? 'Gerando...' : 'Compartilhar CSV',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final copyBtn = Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: _copiarCSVParaClipboard,
+              icon: const Icon(Icons.copy_all_rounded, size: 18, color: Color(0xDD000000)),
+              label: const Flexible(
+                child: Text('Copiar',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Color(0xE6000000), fontWeight: FontWeight.w700)),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0x1F000000)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+            ),
+          ),
+        );
+
+        if (!narrow) {
+          return Row(
+            children: [
+              shareBtn,
+              const SizedBox(width: 8),
+              copyBtn,
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Row(children: [shareBtn]),
+            const SizedBox(height: 8),
+            Row(children: [copyBtn]),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _exportCard() {
     return Container(
@@ -174,10 +265,10 @@ class _ExportarPageState extends State<ExportarPage> {
             const SizedBox(width: 12),
             const Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Exportar para CSV', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                Text('Compartilhar CSV', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 SizedBox(height: 4),
                 Text(
-                  'Baixe seus dados em formato CSV para abrir no Excel,\nGoogle Sheets ou integrar com seu CRM.',
+                  'Gera o CSV e abre o compartilhamento (WhatsApp, Gmail, Drive, etc).',
                   style: TextStyle(fontSize: 13, height: 1.25, color: Color(0x99000000)),
                 ),
               ]),
@@ -185,46 +276,7 @@ class _ExportarPageState extends State<ExportarPage> {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              height: 44,
-              width: 178,
-              child: Material(
-                color: red,
-                borderRadius: BorderRadius.circular(26),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(26),
-                  onTap: _loadingCsv ? null : _baixarCSV,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.download, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      Text(_loadingCsv ? 'Gerando...' : 'Baixar CSV',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: SizedBox(
-                height: 44,
-                child: OutlinedButton.icon(
-                  onPressed: _copiarLink,
-                  icon: const Icon(Icons.copy_all_rounded, size: 18, color: Color(0xDD000000)),
-                  label: const Text('Copiar', style: TextStyle(color: Color(0xE6000000), fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0x1F000000)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        _exportCardButtons(context),
       ]),
     );
   }
@@ -244,7 +296,8 @@ class _ExportarPageState extends State<ExportarPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_qtdClientes == null ? '--' : '${_qtdClientes!}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              Text(_qtdClientes == null ? '--' : '${_qtdClientes!}',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
               const Text('Clientes', style: TextStyle(fontSize: 12.5, color: Color(0x99000000))),
             ],

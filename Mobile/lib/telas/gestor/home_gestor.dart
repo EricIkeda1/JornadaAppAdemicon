@@ -38,6 +38,23 @@ class _HomeGestorState extends State<HomeGestor> {
   bool _loadingMore = false;
   bool _expandirTodos = false;
 
+  String _query = '';
+
+  List<Map<String, dynamic>> get _leadsFiltrados {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _leads;
+    bool contains(dynamic v) => (v ?? '').toString().toLowerCase().contains(q);
+    return _leads.where((c) {
+      return contains(c['nome']) ||
+          contains(c['tel']) ||
+          contains(c['end']) ||
+          contains(c['bairro']) ||
+          contains(c['estab']) ||
+          contains(c['cons']) ||
+          contains(c['obs']);
+    }).toList();
+  }
+
   String _cleanTail(String s) => s.replaceFirst(RegExp(r',\s*$'), '').trimRight();
   String _cleanHead(String s) => s.replaceFirst(RegExp(r'^\s*,\s*'), '').trimLeft();
 
@@ -111,10 +128,7 @@ class _HomeGestorState extends State<HomeGestor> {
         .eq('gestor_id', uidGestor)
         .eq('ativo', true);
     if (rows is! List) return [];
-    return rows
-        .map((r) => (r['uid'] ?? '').toString())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    return rows.map((r) => (r['uid'] ?? '').toString()).where((s) => s.isNotEmpty).toList();
   }
 
   Future<void> _carregarLeads({bool initial = false}) async {
@@ -135,9 +149,9 @@ class _HomeGestorState extends State<HomeGestor> {
     try {
       setState(() => _loadingMore = true);
 
-      // 1) Escopo do time
       final consUids = await _uidsConsultoresDoMeuTime();
       if (consUids.isEmpty) {
+        if (!mounted) return;
         setState(() {
           _loading = false;
           _loadingMore = false;
@@ -146,13 +160,13 @@ class _HomeGestorState extends State<HomeGestor> {
         return;
       }
 
-      // 2) Paginado filtrando por time
       final start = _page * _pageSize;
       final end = start + _pageSize - 1;
 
       final rows = await _sb
           .from('clientes')
-          .select('id, nome, telefone, logradouro, endereco, numero, bairro, cidade, estabelecimento, data_visita, observacoes, consultor_uid_t')
+          .select(
+              'id, nome, telefone, logradouro, endereco, numero, bairro, cidade, estabelecimento, data_visita, observacoes, consultor_uid_t')
           .inFilter('consultor_uid_t', consUids)
           .order('data_visita', ascending: false, nullsFirst: true)
           .range(start, end);
@@ -201,6 +215,7 @@ class _HomeGestorState extends State<HomeGestor> {
         }
       }
 
+      if (!mounted) return;
       setState(() {
         _leads.addAll(batch);
         _page += 1;
@@ -209,6 +224,7 @@ class _HomeGestorState extends State<HomeGestor> {
         _loadingMore = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _erro = 'Erro ao carregar leads';
         _loading = false;
@@ -267,6 +283,9 @@ class _HomeGestorState extends State<HomeGestor> {
 
   @override
   Widget build(BuildContext context) {
+    final totalGeral = _ids.length;
+    final totalFiltro = _leadsFiltrados.length;
+
     return Theme(
       data: Theme.of(context).copyWith(
         scaffoldBackgroundColor: fundoApp,
@@ -291,7 +310,8 @@ class _HomeGestorState extends State<HomeGestor> {
                         Container(
                           color: branco,
                           child: GestorHeaderRow(
-                            total: _ids.length,
+                            totalGeral: totalGeral,
+                            totalFiltro: totalFiltro,
                             onAvisos: () => showModalBottomSheet(
                               context: context,
                               isScrollControlled: true,
@@ -301,6 +321,15 @@ class _HomeGestorState extends State<HomeGestor> {
                               ),
                               builder: (ctx) => const AvisosSheetMock(),
                             ),
+                            query: _query,
+                            onQueryChanged: (value) => setState(() {
+                              _query = value;
+                              _expandirTodos = true;
+                            }),
+                            onClearQuery: () => setState(() {
+                              _query = '';
+                              _expandirTodos = false;
+                            }),
                           ),
                         ),
                       if (_tab == 0) const SizedBox(height: 6),
@@ -312,11 +341,11 @@ class _HomeGestorState extends State<HomeGestor> {
                             _LeadsTab(
                               loading: _loading,
                               erro: _erro,
-                              leads: _leads,
-                              idsCount: _ids.length,
+                              leads: _leadsFiltrados,
+                              idsCount: _leadsFiltrados.length,
                               hasMore: _hasMore,
                               loadingMore: _loadingMore,
-                              expandirTodos: _expandirTodos,
+                              expandirTodos: _expandirTodos || _query.isNotEmpty,
                               onRefresh: _refresh,
                               onCarregarMais: _carregarLeads,
                               onEditar: _abrirEditar,
@@ -432,6 +461,7 @@ class _HomeGestorState extends State<HomeGestor> {
           if (res == null || res is! List || res.isEmpty) {
             throw Exception('Sem permissão para transferir este lead (RLS/escopo).');
           }
+          if (!mounted) return;
           setState(() => c['consUid'] = novoUid);
         },
       ),
@@ -507,9 +537,25 @@ class _LeadsTab extends StatelessWidget {
         child: ListView.separated(
           key: ValueKey('tab_leads_${expandirTodos ? 'all' : 'top10'}'),
           padding: const EdgeInsets.only(top: 0, bottom: 80),
-          itemCount: itemCount,
+          itemCount: (itemCount == 0 ? 1 : itemCount) + 1,
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, idx) {
+            if (idx == 0) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: Text(
+                  total == 0 ? 'Nenhum resultado' : '$total resultado(s)',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF6B6B6B)),
+                ),
+              );
+            }
+
+            if (itemCount == 0) {
+              return const SizedBox.shrink();
+            }
+
+            final realIdx = idx - 1;
+
             final renderCard = (Map<String, dynamic> c) => widgets.LeadCard(
                   nome: c['nome'] as String,
                   telefone: c['tel'] as String,
@@ -520,21 +566,21 @@ class _LeadsTab extends StatelessWidget {
                   dias: (c['dias'] as int?) ?? 0,
                   urgente: (c['urgente'] as bool?) ?? false,
                   alerta: (c['alerta'] as bool?) ?? false,
-                  onEditar: () => onEditar(c, idx),
+                  onEditar: () => onEditar(c, realIdx),
                   onTransferir: () => onTransferir(c),
                 );
 
             if (mostrarLimite) {
-              if (idx < 10) {
-                final c = leads[idx];
+              if (realIdx < 10) {
+                final c = leads[realIdx];
                 return renderCard(c);
               }
-              if (idx == 10) {
+              if (realIdx == 10) {
                 return _CardVerMais(restante: total - 10, onTap: () => setExpandirTodos(true));
               }
             }
 
-            final c = leads[idx];
+            final c = leads[realIdx];
             return renderCard(c);
           },
         ),
