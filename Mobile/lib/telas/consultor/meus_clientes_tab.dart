@@ -56,8 +56,9 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
         .select('*')
         .eq('consultor_uid_t', user.id)
         .order('data_visita', ascending: true, nullsFirst: false)
+
         .asStream();
-  }
+  } 
 
   InputDecoration _decoracaoCampo(BuildContext context, String label, {String? hint, Widget? suffixIcon}) {
     return InputDecoration(
@@ -79,7 +80,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       case 'fechada': return 'Fechada';
       default: return '—';
     }
-  }
+  } 
 
   Color _statusColor(String? v) {
     switch ((v ?? '').toLowerCase()) {
@@ -88,7 +89,56 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       case 'fechada': return Colors.green;
       default: return Colors.grey;
     }
-  }
+  } 
+
+  int _pesoStatus(String? s) {
+    switch ((s ?? '').toLowerCase()) {
+      case 'conexao': return 0;
+      case 'negociacao': return 1;
+      case 'fechada': return 2;
+      default: return 3;
+    }
+  } 
+
+  DateTime? _parseVisita(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v.toLocal();
+    if (v is String) return DateTime.tryParse(v)?.toLocal();
+    if (v is Map && v['value'] is String) return DateTime.tryParse(v['value'])?.toLocal();
+    return null;
+  } 
+
+  int _compareCliente(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final pa = _pesoStatus(a['status_negociacao']?.toString());
+    final pb = _pesoStatus(b['status_negociacao']?.toString());
+    if (pa != pb) return pa.compareTo(pb);
+
+    final DateTime? da = _parseVisita(a['data_visita']);
+    final DateTime? db = _parseVisita(b['data_visita']);
+    int cat(DateTime? d) {
+      if (d == null) return 3;
+      final now = DateTime.now();
+      final h = DateTime(now.year, now.month, now.day);
+      final dh = DateTime(d.year, d.month, d.day);
+      if (dh == h) return 0;
+      if (dh.isAfter(h)) return 1;
+      return 2;
+    }
+    final ca = cat(da), cb = cat(db);
+    if (ca != cb) return ca.compareTo(cb);
+    if (da != null && db != null) {
+      final cmp = da.compareTo(db);
+      if (cmp != 0) return cmp;
+    } else if (da == null && db != null) {
+      return 1;
+    } else if (da != null && db == null) {
+      return -1;
+    }
+
+    final sa = (a['estabelecimento'] ?? a['nome'] ?? '').toString().toLowerCase();
+    final sb = (b['estabelecimento'] ?? b['nome'] ?? '').toString().toLowerCase();
+    return sa.compareTo(sb);
+  } 
 
   @override
   Widget build(BuildContext context) {
@@ -131,13 +181,13 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
               List<Map<String, dynamic>> clientesFiltrados;
               if (_query.isEmpty) {
-                clientesFiltrados = clientes;
+                clientesFiltrados = [...clientes];
               } else {
                 String s(Object? x) => (x ?? '').toString().toLowerCase();
                 clientesFiltrados = clientes.where((c) {
                   final estabelecimento = s(c['estabelecimento'].toString().isNotEmpty ? c['estabelecimento'] : c['nome']);
-                  final logradouro = s(c['logradouro']); 
-                  final endereco = s(c['endereco']);   
+                  final logradouro = s(c['logradouro']);
+                  final endereco = s(c['endereco']);
                   final numero = s(c['numero']);
                   final bairro = s(c['bairro']);
                   final cidade = s(c['cidade']);
@@ -152,6 +202,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                          valor.contains(q);
                 }).toList();
               }
+
+              clientesFiltrados.sort(_compareCliente);
 
               if (clientesFiltrados.isEmpty) {
                 return SliverToBoxAdapter(
@@ -231,19 +283,11 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     );
   }
 
-  DateTime? _parseVisita(dynamic v) {
-    if (v == null) return null;
-    if (v is DateTime) return v.toLocal();
-    if (v is String) return DateTime.tryParse(v)?.toLocal();
-    if (v is Map && v['value'] is String) return DateTime.tryParse(v['value'])?.toLocal();
-    return null;
-  }
-
   Widget _buildClienteItem(Map<String, dynamic> c) {
     final String titulo = (c['estabelecimento'] ?? c['nome'] ?? 'Cliente').toString().trim();
 
-    final String tipoAbrev = (c['logradouro'] ?? '').toString().trim(); 
-    final String nomeVia = (c['endereco'] ?? '').toString().trim();    
+    final String tipoAbrev = (c['logradouro'] ?? '').toString().trim();
+    final String nomeVia = (c['endereco'] ?? '').toString().trim();
     final String numero = (c['numero'] ?? '').toString().trim();
     final String complemento = (c['complemento'] ?? '').toString().trim();
     final String bairro = (c['bairro'] ?? '').toString().trim();
@@ -268,7 +312,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
     String dataFormatada = 'Data não informada';
     if (dataVisita != null) {
-      dataFormatada = 'Próxima visita: ${DateFormat('dd/MM/yyyy').format(dataVisita)}';
+      dataFormatada = 'Próxima visita: ${DateFormat('dd/MM/yyyy HH:mm').format(dataVisita)}';
     }
 
     final String statusTec = (c['status_negociacao'] ?? '').toString();
@@ -628,8 +672,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                             await _client.from('clientes').update({
                               'status_negociacao': _statusTecEd,
                               'valor_proposta': valor,
-                              'logradouro': logradouroAbrev,  
-                              'endereco'  : nomeViaPuro,      
+                              'logradouro': logradouroAbrev,
+                              'endereco'  : nomeViaPuro,
                               'numero': numeroCtrl.text.trim(),
                               'bairro': bairroCtrl.text.trim(),
                               'cidade': cidadeCtrl.text.trim(),
