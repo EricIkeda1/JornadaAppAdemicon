@@ -22,27 +22,23 @@ final DateFormat _fmtB = DateFormat('EEE, d MMM y', 'pt_BR');
 
 class VisitVM {
   final String id;
-  final String estabelecimento;
-  final String enderecoCompleto;
+  final String ruaNumero; // apenas “logradouro, número”
   final String dataFmt;
   final IconData icone;
-  final String statusTxt; 
+  final String statusTxt;
   final Color corFundo;
   final Color corTexto;
   final String? negociacaoRaw;
-  final String? valorPropostaFmt;
 
   const VisitVM({
     required this.id,
-    required this.estabelecimento,
-    required this.enderecoCompleto,
+    required this.ruaNumero,
     required this.dataFmt,
     required this.icone,
     required this.statusTxt,
     required this.corFundo,
     required this.corTexto,
     this.negociacaoRaw,
-    this.valorPropostaFmt,
   });
 }
 
@@ -103,9 +99,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
           schema: 'public',
           table: 'clientes',
           callback: (payload) {
-            if (mounted) {
-              setState(_invalidateCaches);
-            }
+            if (mounted) setState(_invalidateCaches);
           },
         )
         .subscribe();
@@ -121,7 +115,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     if (user == null) return const Stream<List<Map<String, dynamic>>>.empty();
     return _client
         .from('clientes')
-        .select('id, estabelecimento, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t, status_negociacao, valor_proposta')
+        .select('id, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t, status_negociacao')
         .eq('consultor_uid_t', user.id)
         .order('data_visita', ascending: false)
         .order('hora_visita', ascending: false)
@@ -131,7 +125,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
   Stream<List<Map<String, dynamic>>> get _todasVisitasStream {
     return _client
         .from('clientes')
-        .select('id, estabelecimento, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t, status_negociacao, valor_proposta')
+        .select('id, endereco, cidade, estado, data_visita, hora_visita, consultor_uid_t, status_negociacao')
         .order('data_visita', ascending: false)
         .order('hora_visita', ascending: false)
         .asStream();
@@ -172,12 +166,12 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     final amanha = DateTime(hoje.year, hoje.month, hoje.day + 1);
     final horaExibida = _fmtHora.format(d);
     if (d.year == hoje.year && d.month == hoje.month && d.day == hoje.day) {
-      return 'Hoje às $horaExibida';
+      return 'Hoje • $horaExibida';
     } else if (d.year == amanha.year && d.month == amanha.month && d.day == amanha.day) {
-      return 'Amanhã às $horaExibida';
+      return 'Amanhã • $horaExibida';
     } else {
       final base = d.year == hoje.year ? _fmtA : _fmtB;
-      return '${_capitalize(base.format(d))} às $horaExibida';
+      return '${_capitalize(base.format(d))} • $horaExibida';
     }
   }
 
@@ -344,7 +338,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Minhas Visitas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _kTitle, letterSpacing: -0.2)),
+                Text('Visitas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: _kTitle, letterSpacing: -0.2)),
                 SizedBox(height: 2),
                 Text('Agenda e acompanhamento', style: TextStyle(fontSize: 12.5, color: _kText, fontWeight: FontWeight.w400)),
               ],
@@ -465,12 +459,35 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
     );
   }
 
+  // Extrai “logradouro, número” de um endereço livre.
+  String _extrairRuaNumero(String end) {
+    String ruaNumero = end.trim();
+    if (ruaNumero.isEmpty) return ruaNumero;
+
+    final parts = ruaNumero.split(',');
+    String logradouro = parts.first.trim();
+    String numero = '';
+
+    if (parts.length > 1) {
+      final resto = parts.sublist(1).join(',').trim();
+      final m = RegExp(r'(^|\\s|,|-)(\\d{1,6})').firstMatch(resto);
+      if (m != null) numero = m.group(2)!;
+    } else {
+      final m = RegExp(r'(\\d{1,6})$').firstMatch(logradouro);
+      if (m != null) {
+        numero = m.group(1)!;
+        logradouro = logradouro.replaceAll(RegExp(r'(\\s|,|-)?\\d{1,6}$'), '').trim();
+      }
+    }
+
+    return numero.isEmpty ? logradouro : '$logradouro, $numero';
+  }
+
   VisitVM _toVM(Map<String, dynamic> c) {
     final end = (c['endereco'] ?? '').toString().trim();
-    final cidade = (c['cidade'] ?? '').toString().trim();
-    final estado = (c['estado'] ?? '').toString().trim();
     final ds = (c['data_visita'] ?? '').toString();
     final hs = (c['hora_visita'] ?? '').toString();
+
     DateTime? d;
     if (ds.isNotEmpty) {
       try { d = DateTime.parse(ds).toLocal(); } catch (_) {}
@@ -484,38 +501,20 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
         d = DateTime(d.year, d.month, d.day, 23, 59, 59);
       }
     }
+
     final dataFmt = _formatarDataVisitaDT(d);
     final s = _determinarStatus(ds, horaVisitaStr: hs);
-    final enderecoCompleto = [
-      if (end.isNotEmpty) end,
-      if (cidade.isNotEmpty || estado.isNotEmpty) '$cidade - $estado',
-    ].where((e) => e.isNotEmpty).join(', ');
-
-    String? valorFmt;
-    final vp = c['valor_proposta'];
-    if (vp != null) {
-      try {
-        final num n = (vp is num) ? vp : num.parse(vp.toString());
-        valorFmt = NumberFormat.simpleCurrency(locale: 'pt_BR').format(n);
-      } catch (_) {
-        final s = vp.toString().trim();
-        if (s.isNotEmpty) valorFmt = s;
-      }
-    }
+    final ruaNumero = _extrairRuaNumero(end);
 
     return VisitVM(
       id: (c['id'] ?? '').toString(),
-      estabelecimento: ((c['estabelecimento'] ?? '').toString().trim().isEmpty)
-          ? 'Estabelecimento não informado'
-          : (c['estabelecimento'] ?? '').toString().trim(),
-      enderecoCompleto: enderecoCompleto,
+      ruaNumero: ruaNumero,
       dataFmt: dataFmt,
       icone: s['icone'] as IconData,
       statusTxt: s['texto'] as String,
       corFundo: s['corFundo'] as Color,
       corTexto: s['corTexto'] as Color,
       negociacaoRaw: (c['status_negociacao'] as String?)?.trim(),
-      valorPropostaFmt: valorFmt,
     );
   }
 
@@ -545,7 +544,12 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
           Row(
             children: [
               Expanded(
-                child: Text(vm.estabelecimento, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _kTitle)),
+                child: Text(
+                  vm.ruaNumero,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _kTitle),
+                ),
               ),
               const SizedBox(width: 8),
               Container(
@@ -565,19 +569,6 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
               _chipNegociacaoReadonly(vm),
             ],
           ),
-          if (vm.enderecoCompleto.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: _kMuted),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(vm.enderecoCompleto, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: _kText, height: 1.4)),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -585,27 +576,19 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
               const SizedBox(width: 6),
               Text(vm.dataFmt, style: const TextStyle(fontSize: 13, color: _kTitle, fontWeight: FontWeight.w500)),
               const Spacer(),
-              if (mostrarRota && vm.enderecoCompleto.trim().length > 3)
+              if (mostrarRota && vm.ruaNumero.trim().length > 3)
                 TextButton.icon(
                   style: TextButton.styleFrom(
                     foregroundColor: _kPrimary,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: _kBorder)),
                   ),
-                  onPressed: () => _abrirNoGoogleMaps(vm.enderecoCompleto),
+                  onPressed: () => _abrirNoGoogleMaps(vm.ruaNumero),
                   icon: const Icon(Icons.map_outlined, size: 16),
                   label: const Text('Rota', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                 ),
             ],
           ),
-          if ((vm.valorPropostaFmt ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(children: [
-              const Icon(Icons.attach_money, size: 16, color: _kMuted),
-              const SizedBox(width: 6),
-              Text('Proposta: ${vm.valorPropostaFmt}', style: const TextStyle(fontSize: 13, color: _kTitle)),
-            ]),
-          ],
         ],
       ),
     );
@@ -679,7 +662,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
         if (_todosExpanded) {
           _ruasTodas
             ..clear()
-            ..addAll(agendadosFiltrados.map((vm) => vm.enderecoCompleto.split(',').first.trim()).where((s) => s.isNotEmpty));
+            ..addAll(agendadosFiltrados.map((vm) => vm.ruaNumero).where((s) => s.isNotEmpty));
         }
 
         final count = agendadosFiltrados.length;
@@ -861,7 +844,7 @@ class _MinhasVisitasTabState extends State<MinhasVisitasTab> with TickerProvider
 
                   _ruasTodas
                     ..clear()
-                    ..addAll(base.map((c) => (c['endereco'] ?? '').toString().trim()).where((s) => s.isNotEmpty));
+                    ..addAll(base.map((c) => _extrairRuaNumero((c['endereco'] ?? '').toString())).where((s) => s.isNotEmpty));
 
                   final agora = DateTime.now();
                   final hojeIni = DateTime(agora.year, agora.month, agora.day, 0, 0, 0);

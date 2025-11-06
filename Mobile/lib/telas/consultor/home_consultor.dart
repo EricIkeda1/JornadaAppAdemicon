@@ -574,7 +574,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
                     boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
                   ),
                   tabs: [
-                    Tab(text: 'Minhas Visitas'),
+                    Tab(text: 'Visitas'),
                     Tab(text: 'Cadastrar Cliente'),
                     Tab(text: 'Meus Clientes'),
                     Tab(text: 'Exportar Dados'),
