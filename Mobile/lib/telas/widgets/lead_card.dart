@@ -12,8 +12,9 @@ class LeadCard extends StatelessWidget {
   final VoidCallback onEditar;
   final VoidCallback onTransferir;
 
-  // NOVO: estabelecimento opcional (default = '')
   final String estabelecimento;
+
+  final String? status;
 
   const LeadCard({
     super.key,
@@ -27,7 +28,8 @@ class LeadCard extends StatelessWidget {
     required this.alerta,
     required this.onEditar,
     required this.onTransferir,
-    this.estabelecimento = '', // compatível com chamadas antigas
+    this.estabelecimento = '',
+    this.status,
   });
 
   static const branco = Color(0xFFFFFFFF);
@@ -39,6 +41,8 @@ class LeadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final temStatus = (status ?? '').trim().isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12),
       color: branco,
@@ -56,7 +60,11 @@ class LeadCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     nome,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: texto),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: texto,
+                    ),
                   ),
                 ),
                 _DiasBadge(dias: dias, alerta: alerta, urgente: urgente),
@@ -64,41 +72,52 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Telefone
             Row(
               children: [
                 const Icon(Icons.phone, size: 16, color: cinzaIcone),
                 const SizedBox(width: 8),
-                Expanded(child: Text(telefone, style: const TextStyle(fontSize: 13.5, color: texto))),
+                Expanded(
+                  child: Text(
+                    telefone,
+                    style: const TextStyle(fontSize: 13.5, color: texto),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
 
-            // Endereço
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.location_on_outlined, size: 16, color: cinzaIcone),
                 const SizedBox(width: 8),
-                Expanded(child: Text(endereco, style: const TextStyle(fontSize: 13.5, color: texto))),
+                Expanded(
+                  child: Text(
+                    endereco,
+                    style: const TextStyle(fontSize: 13.5, color: texto),
+                  ),
+                ),
               ],
             ),
 
-            // NOVO: Estabelecimento
             if (estabelecimento.isNotEmpty) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
                   const Icon(Icons.storefront_outlined, size: 16, color: cinzaIcone),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(estabelecimento, style: const TextStyle(fontSize: 13.5, color: texto))),
+                  Expanded(
+                    child: Text(
+                      estabelecimento,
+                      style: const TextStyle(fontSize: 13.5, color: texto),
+                    ),
+                  ),
                 ],
               ),
             ],
 
             const SizedBox(height: 6),
 
-            // Consultor
             Row(
               children: [
                 const Icon(Icons.person_outline, size: 16, color: cinzaIcone),
@@ -111,9 +130,26 @@ class LeadCard extends StatelessWidget {
                 ),
               ],
             ),
+
+            if (temStatus) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.handshake_outlined, size: 16, color: cinzaIcone),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Status negociação: ${status!.trim()}',
+                      style: const TextStyle(fontSize: 13.5, color: texto),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
             const SizedBox(height: 10),
 
-            // Observação
             Container(
               width: double.infinity,
               constraints: const BoxConstraints(minHeight: 44),
@@ -138,7 +174,6 @@ class LeadCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Ações
             Row(
               children: [
                 _BotaoTexto(
@@ -187,8 +222,14 @@ class _DiasBadge extends StatelessWidget {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Text('$dias dias', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$dias dias',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg),
+      ),
     );
   }
 }
@@ -227,7 +268,10 @@ class _BotaoTexto extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: cor),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cor)),
+              Text(
+                label,
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cor),
+              ),
             ],
           ),
         ),

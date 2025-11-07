@@ -21,20 +21,47 @@ class _EnderecoRepo {
   String _cleanHead(String s) => s.replaceFirst(RegExp(r'^\s*,\s*'), '').trimLeft();
 
   String _fixCommaAfterTypeAtStart(String s) {
-    final reDot = RegExp(r'^\s*(R\.|Av\.|Rod\.|Al\.|Trav\.)\s*,\s*', caseSensitive: false);
-    final reFull = RegExp(r'^\s*(Rua|Avenida|Rodovia|Alameda|Travessa)\s*,\s*', caseSensitive: false);
+    final reDot = RegExp(
+      r'^\s*(R\.|Av\.|Rod\.|Al\.|Trav\.|Tv\.)\s*,\s*',
+      caseSensitive: false,
+    );
+    final reFull = RegExp(
+      r'^\s*(Rua|Avenida|Rodovia|Alameda|Travessa)\s*,\s*',
+      caseSensitive: false,
+    );
     var out = s;
     out = out.replaceFirstMapped(reDot, (m) => '${m.group(1)} ');
     out = out.replaceFirstMapped(reFull, (m) => '${m.group(1)} ');
-    return out;
+    return out.trim();
+  }
+
+  String _fixCommaAfterTypeAnywhere(String s) {
+    final reDot = RegExp(
+      r'(?<=^|[\s,])(R\.|Av\.|Rod\.|Al\.|Trav\.|Tv\.)\s*,\s+',
+      caseSensitive: false,
+    );
+    final reFull = RegExp(
+      r'(?<=^|[\s,])(Rua|Avenida|Rodovia|Alameda|Travessa)\s*,\s+',
+      caseSensitive: false,
+    );
+    var out = s.replaceAllMapped(reDot, (m) => '${m.group(1)} ');
+    out = out.replaceAllMapped(reFull, (m) => '${m.group(1)} ');
+    return out.trim();
   }
 
   String _removeCommaBeforeTypes(String s) {
     final pattern = RegExp(
-      r',\s*(?=(R\.|Av\.|Rod\.|Al\.|Trav\.|Rua|Avenida|Rodovia|Alameda|Travessa)\b)',
+      r',\s*(?=(R\.|Av\.|Rod\.|Al\.|Trav\.|Tv\.|Rua|Avenida|Rodovia|Alameda|Travessa)\b)',
       caseSensitive: false,
     );
     return s.replaceAll(pattern, ' ');
+  }
+
+  String _normalizeSpacesAndCommas(String s) {
+    var out = s.replaceAll(RegExp(r'\s+'), ' ');
+    out = out.replaceAll(RegExp(r'\s*,\s*'), ', ');
+    out = out.replaceAll(RegExp(r',\s*,+'), ', ');
+    return out.trim();
   }
 
   String _fmtLogEndNumCompl({
@@ -43,10 +70,12 @@ class _EnderecoRepo {
     required String numero,
     required String complemento,
   }) {
-    var l = _fixCommaAfterTypeAtStart(_cleanTail(logradouro));
-    final e = _cleanTail(endereco);
+    var l = _cleanTail(logradouro);
+    var e = _cleanTail(endereco);
     final n = numero.trim();
     final c = complemento.trim();
+
+    l = _fixCommaAfterTypeAtStart(l);
 
     final partes = <String>[];
     if (l.isNotEmpty) partes.add(l);
@@ -55,10 +84,12 @@ class _EnderecoRepo {
     if (c.isNotEmpty) partes.add(c);
 
     var out = partes.join(', ');
+
+    out = _fixCommaAfterTypeAnywhere(out);
+    out = _removeCommaBeforeTypes(out);
     out = _cleanHead(out);
     out = _cleanTail(out);
-    out = _removeCommaBeforeTypes(out);
-    out = out.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    out = _normalizeSpacesAndCommas(out);
     return out;
   }
 

@@ -9,15 +9,24 @@ class VendasPage extends StatefulWidget {
   State<VendasPage> createState() => _VendasPageState();
 }
 
-class _VendasPageState extends State<VendasPage> {
+class _VendasPageState extends State<VendasPage>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  static bool _jaAnimouUmaVezGlobal = false;
+
   final SupabaseClient _client = Supabase.instance.client;
   RealtimeChannel? _chan;
 
-  // Sempre visão do time do gestor logado
   double totalVendas = 0;
   double mediaMensal = 0;
   double melhorMesValor = 0;
   int periodoMeses = 6;
+
+  double animTotal = 0;
+  double animMedia = 0;
+  double animMelhor = 0;
+  double animPeriodo = 0;
+
+  late final AnimationController _kpiCtrl;
 
   List<String> meses = [];
   List<double> realizado = [];
@@ -25,11 +34,17 @@ class _VendasPageState extends State<VendasPage> {
   final Color primary = const Color(0xFFDC2C2C);
   final Color primaryLight = const Color(0xFFF06666);
 
-  String moeda(double v) => NumberFormat.simpleCurrency(locale: 'pt_BR').format(v);
+  String moeda(double v) =>
+      NumberFormat.simpleCurrency(locale: 'pt_BR').format(v);
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    _kpiCtrl =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
     WidgetsBinding.instance.addPostFrameCallback((_) => _carregarDados());
     _inscreverRealtime();
   }
@@ -37,6 +52,7 @@ class _VendasPageState extends State<VendasPage> {
   @override
   void dispose() {
     if (_chan != null) _client.removeChannel(_chan!);
+    _kpiCtrl.dispose();
     super.dispose();
   }
 
@@ -49,199 +65,207 @@ class _VendasPageState extends State<VendasPage> {
             schema: 'public',
             table: 'clientes',
             callback: (_) {
-              if (mounted) _carregarDados();
+              if (mounted) _carregarDados(animarSeNecessario: false);
             },
           )
           .subscribe();
     } catch (_) {}
   }
 
-  Future<void> _carregarDados() async {
+  Future<void> _carregarDados({bool animarSeNecessario = true}) async {
     try {
-      final uid = _client.auth.currentUser?.id;
-      if (uid == null) return;
+      final uidGestor = _client.auth.currentUser?.id;
+      if (uidGestor == null) return;
 
-      // -------- vendas_mensais: filtros antes de order --------
-      var mensalQ = _client.from('vendas_mensais').select('mes_ord, mes_abrev, realizado');
-      mensalQ = mensalQ.filter('gestor_id', 'eq', uid);
-      final mensal = await mensalQ.order('mes_ord', ascending: true);
+      final cons = await _client
+          .from('consultores')
+          .select('uid, data_cadastro')
+          .eq('gestor_id', uidGestor)
+          .eq('ativo', true);
 
-      if (mensal is List && mensal.isNotEmpty) {
-        final ms = mensal.map((e) => (e['mes_abrev'] ?? '').toString()).toList().cast<String>();
-        final rl = mensal
-            .map((e) {
-              final r = e['realizado'];
-              if (r is num) return r.toDouble();
-              if (r is String) return double.tryParse(r.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
-              return 0.0;
-            })
-            .toList()
-            .cast<double>();
-        if (mounted) {
-          setState(() {
-            meses = ms;
-            realizado = rl;
-          });
+      final List<String> uids = (cons is List)
+          ? cons
+              .map((e) => (e['uid'] ?? '').toString())
+              .where((s) => s.isNotEmpty)
+              .toList()
+          : <String>[];
+
+      DateTime? inicioTime;
+      if (cons is List && cons.isNotEmpty) {
+        for (final e in cons) {
+          final dc = e['data_cadastro'];
+          final dt = dc == null ? null : DateTime.tryParse(dc.toString());
+          if (dt != null) {
+            inicioTime = (inicioTime == null || dt.isBefore(inicioTime!)) ? dt : inicioTime;
+          }
         }
-      } else {
-        await _agregarLocalmenteApenasFinalizadas(gestorId: uid);
       }
 
-      // -------- vendas_kpis: filtros antes de limit --------
-      var kpisQ = _client.from('vendas_kpis').select();
-      kpisQ = kpisQ.filter('gestor_id', 'eq', uid);
-      final kpis = await kpisQ.limit(1);
+      Map<String, double> somaMes = {};
+      DateTime? primeiraVenda;
 
-      if (kpis is List && kpis.isNotEmpty) {
-        final k = kpis.first as Map<String, dynamic>;
-        if (mounted) {
-          setState(() {
-            totalVendas = _toDouble(k['total_vendas']);
-            mediaMensal = _toDouble(k['media_mensal']);
-            melhorMesValor = _toDouble(k['melhor_mes']);
-            periodoMeses = _toInt(k['periodo_meses'], 6);
-          });
+      if (uids.isNotEmpty) {
+        final valores = uids.map((e) => '"$e"').join(',');
+        final vendas = await _client
+            .from('clientes')
+            .select('data_visita, status_negociacao, valor_proposta, consultor_uid_t')
+            .filter('status_negociacao', 'in', '("fechado","fechada","venda")')
+            .filter('consultor_uid_t', 'in', '($valores)')
+            .order('data_visita', ascending: true);
+
+        String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+
+        if (vendas is List) {
+          for (final row in vendas) {
+            final ds = (row['data_visita'] ?? '').toString();
+            final d = DateTime.tryParse(ds)?.toLocal();
+            if (d == null) continue;
+
+            primeiraVenda ??= DateTime(d.year, d.month, 1);
+
+            final rawValor = row['valor_proposta'];
+            final v = switch (rawValor) {
+              num n => n.toDouble(),
+              String s => double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
+              _ => 0.0,
+            };
+
+            final key = fmtKey(DateTime(d.year, d.month, 1));
+            somaMes.update(key, (old) => old + v, ifAbsent: () => v);
+          }
         }
-      } else {
-        _calcularKpisFallback();
       }
-    } catch (_) {
-      final uid = _client.auth.currentUser?.id;
-      await _agregarLocalmenteApenasFinalizadas(gestorId: uid);
-      _calcularKpisFallback();
-    }
-  }
 
-  double _toDouble(dynamic v) {
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0;
-    return 0.0;
-  }
+      DateTime? inicioSerie = inicioTime;
+      if (inicioSerie == null || (primeiraVenda != null && primeiraVenda!.isBefore(inicioSerie))) {
+        inicioSerie = primeiraVenda;
+      }
 
-  int _toInt(dynamic v, int def) {
-    if (v is num) return v.toInt();
-    if (v is String) return int.tryParse(v) ?? def;
-    return def;
-  }
-
-  // Sempre agrega apenas dos consultores do gestor
-  Future<void> _agregarLocalmenteApenasFinalizadas({required String? gestorId}) async {
-    final now = DateTime.now();
-    final inicio = DateTime(now.year, now.month - 5, 1);
-    final inicioStr = DateFormat('yyyy-MM-dd').format(inicio);
-
-    try {
-      if (gestorId == null) {
+      if (inicioSerie == null) {
         if (mounted) {
           setState(() {
-            meses = _ultimoSemestreLabels(now);
-            realizado = List<double>.filled(6, 0);
+            meses = [];
+            realizado = [];
+            totalVendas = 0;
+            mediaMensal = 0;
+            melhorMesValor = 0;
+            periodoMeses = 0;
+            animTotal = 0;
+            animMedia = 0;
+            animMelhor = 0;
+            animPeriodo = 0;
           });
         }
         return;
       }
 
-      // Busca UIDs dos consultores do gestor
-      var consQ = _client.from('consultores').select('uid');
-      consQ = consQ.filter('gestor_id', 'eq', gestorId).filter('ativo', 'eq', true);
-      final ids = await consQ;
+      final now = DateTime.now();
+      final abrev = DateFormat('MMM', 'pt_BR');
+      String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
-      List<String> consultoresUids = [];
-      if (ids is List && ids.isNotEmpty) {
-        consultoresUids = ids
-            .map((e) => (e['uid'] ?? '').toString())
-            .where((s) => s.isNotEmpty)
-            .toList();
+      DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
+      DateTime end = DateTime(start.year, start.month + 5, 1);
+
+      final present = DateTime(now.year, now.month, 1);
+      if (end.isAfter(present)) {
+        end = present;
+        start = DateTime(end.year, end.month - 5, 1);
       }
 
-      if (consultoresUids.isEmpty) {
-        if (mounted) {
-          setState(() {
-            meses = _ultimoSemestreLabels(now);
-            realizado = List<double>.filled(6, 0);
-          });
-        }
-        return;
+      final List<String> ms = [];
+      final List<double> rl = [];
+
+      DateTime cursor = start;
+      while (!cursor.isAfter(end)) {
+        final key = fmtKey(cursor);
+        ms.add(abrev.format(cursor));
+        rl.add(somaMes[key] ?? 0.0);
+        cursor = DateTime(cursor.year, cursor.month + 1, 1);
       }
 
-      // Consulta clientes somente dos consultores do gestor
-      final valores = consultoresUids.map((e) => '"$e"').join(',');
-      var q = _client
-          .from('clientes')
-          .select('data_visita, status_negociacao, valor_proposta, consultor_uid_t')
-          .filter('status_negociacao', 'in', '("fechado","fechada","venda")')
-          .filter('consultor_uid_t', 'in', '($valores)')
-          .gte('data_visita', inicioStr);
-
-      final res = await q.order('data_visita', ascending: true);
-
-      final Map<String, double> somaMes = {};
-      final DateFormat abrev = DateFormat('MMM', 'pt_BR');
-
-      for (var i = 0; i < 6; i++) {
-        final d = DateTime(now.year, now.month - 5 + i, 1);
-        final key = abrev.format(d);
-        somaMes[key] = 0;
+      while (ms.length < 6) {
+        final next = DateTime(end.year, end.month + (ms.length - 5), 1);
+        ms.add(abrev.format(next));
+        rl.add(0.0);
       }
-
-      if (res is List) {
-        for (final row in res) {
-          final ds = (row['data_visita'] ?? '').toString();
-          if (ds.isEmpty) continue;
-          final d = DateTime.tryParse(ds)?.toLocal();
-          if (d == null) continue;
-
-          final key = abrev.format(DateTime(d.year, d.month, 1));
-
-          final rawValor = row['valor_proposta'];
-          final v = switch (rawValor) {
-            num n => n.toDouble(),
-            String s => double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
-            _ => 0.0,
-          };
-
-          somaMes.update(key, (old) => old + v, ifAbsent: () => v);
-        }
+      if (ms.length > 6) {
+        ms.removeRange(0, ms.length - 6);
+        rl.removeRange(0, rl.length - 6);
       }
-
-      final sortedMeses = somaMes.keys.toList()
-        ..sort((a, b) {
-          final order = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-          return order.indexOf(a.toLowerCase()).compareTo(order.indexOf(b.toLowerCase()));
-        });
 
       if (mounted) {
         setState(() {
-          meses = sortedMeses;
-          realizado = sortedMeses.map((m) => somaMes[m] ?? 0).toList();
+          meses = ms;
+          realizado = rl;
+          totalVendas = rl.fold<double>(0, (a, b) => a + b);
+          periodoMeses = rl.length; // sempre 6
+          mediaMensal = periodoMeses == 0 ? 0 : totalVendas / periodoMeses;
+          melhorMesValor = rl.isEmpty ? 0 : rl.reduce((a, b) => a > b ? a : b);
         });
       }
-    } catch (_) {}
+
+      final deveAnimar = animarSeNecessario && !_jaAnimouUmaVezGlobal;
+      if (deveAnimar) {
+        _rodarAnimacaoKpis();
+        _jaAnimouUmaVezGlobal = true;
+      } else {
+        if (mounted) {
+          setState(() {
+            animTotal = totalVendas;
+            animMedia = mediaMensal;
+            animMelhor = melhorMesValor;
+            animPeriodo = periodoMeses.toDouble();
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          meses = [];
+          realizado = [];
+          totalVendas = 0;
+          mediaMensal = 0;
+          melhorMesValor = 0;
+          periodoMeses = 0;
+          animTotal = 0;
+          animMedia = 0;
+          animMelhor = 0;
+          animPeriodo = 0;
+        });
+      }
+    }
   }
 
-  List<String> _ultimoSemestreLabels(DateTime now) {
-    final DateFormat abrev = DateFormat('MMM', 'pt_BR');
-    return List.generate(6, (i) => abrev.format(DateTime(now.year, now.month - 5 + i, 1)));
-  }
+  void _rodarAnimacaoKpis() {
+    final tTween = Tween<double>(begin: 0, end: totalVendas);
+    final mTween = Tween<double>(begin: 0, end: mediaMensal);
+    final bTween = Tween<double>(begin: 0, end: melhorMesValor);
+    final pTween = Tween<double>(begin: 0, end: periodoMeses.toDouble());
 
-  void _calcularKpisFallback() {
-    if (!mounted) return;
-    setState(() {
-      totalVendas = realizado.fold<double>(0, (a, b) => a + b);
-      periodoMeses = meses.isEmpty ? 6 : meses.length;
-      mediaMensal = periodoMeses == 0 ? 0 : totalVendas / periodoMeses;
-      melhorMesValor = realizado.isEmpty ? 0 : realizado.reduce((a, b) => a > b ? a : b);
-    });
+    _kpiCtrl
+      ..reset()
+      ..addListener(() {
+        if (!mounted) return;
+        setState(() {
+          final t = Curves.easeOutCubic.transform(_kpiCtrl.value);
+          animTotal = tTween.transform(t);
+          animMedia = mTween.transform(t);
+          animMelhor = bTween.transform(t);
+          animPeriodo = pTween.transform(t);
+        });
+      })
+      ..forward();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverAppBar(
+          const SliverAppBar(
             pinned: false,
             backgroundColor: Colors.white,
             elevation: 0,
@@ -277,7 +301,7 @@ class _VendasPageState extends State<VendasPage> {
                     children: [
                       _BigKpiCard(
                         title: 'Total Vendas',
-                        value: moeda(totalVendas),
+                        value: moeda(animTotal),
                         icon: Icons.attach_money_rounded,
                         gradient: LinearGradient(
                           colors: [primary, primaryLight],
@@ -285,16 +309,32 @@ class _VendasPageState extends State<VendasPage> {
                           end: Alignment.bottomRight,
                         ),
                       ),
-                      _KpiCard(title: 'Média Mensal', value: moeda(mediaMensal), icon: Icons.track_changes_rounded),
-                      _KpiCard(title: 'Melhor Mês', value: moeda(melhorMesValor), icon: Icons.emoji_events_outlined),
-                      _KpiCard(title: 'Período', value: '$periodoMeses meses', icon: Icons.event_note_outlined),
+                      _KpiCard(
+                        title: 'Média Mensal',
+                        value: moeda(animMedia),
+                        icon: Icons.track_changes_rounded,
+                      ),
+                      _KpiCard(
+                        title: 'Melhor Mês',
+                        value: moeda(animMelhor),
+                        icon: Icons.emoji_events_outlined,
+                      ),
+                      _KpiCard(
+                        title: 'Período',
+                        value: '${animPeriodo.toStringAsFixed(0)} meses',
+                        icon: Icons.event_note_outlined,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   _ChartCard(
                     title: 'Evolução de Vendas',
                     subtitle: 'Somente vendas finalizadas - Meu time',
-                    child: _BarrasVendasChart(meses: meses, realizado: realizado, primary: primary),
+                    child: _BarrasVendasChart(
+                      meses: meses,
+                      realizado: realizado,
+                      primary: primary,
+                    ),
                   ),
                 ],
               ),
@@ -305,8 +345,6 @@ class _VendasPageState extends State<VendasPage> {
     );
   }
 }
-
-// ==================== UI Auxiliares ====================
 
 class _HeaderRow extends StatelessWidget {
   final String title;
@@ -543,7 +581,11 @@ class _BarrasVendasChart extends StatelessWidget {
             toY: (realizado[i] / 1000).clamp(0, double.infinity),
             width: 20,
             borderRadius: BorderRadius.circular(4),
-            gradient: LinearGradient(colors: [primary, primary.withOpacity(.85)], begin: Alignment.bottomCenter, end: Alignment.topCenter),
+            gradient: LinearGradient(
+              colors: [primary, primary.withOpacity(.85)],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
           ),
         ],
       );
