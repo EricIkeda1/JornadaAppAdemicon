@@ -43,7 +43,22 @@ class _HomeGestorState extends State<HomeGestor> {
   List<Map<String, dynamic>> get _leadsFiltrados {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return _leads;
-    bool contains(dynamic v) => (v ?? '').toString().toLowerCase().contains(q);
+    String norm(String s) => s
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('à', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('ã', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ô', 'o')
+        .replaceAll('õ', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ç', 'c');
+    final nq = norm(q);
+    bool contains(dynamic v) => norm((v ?? '').toString()).contains(nq);
     return _leads.where((c) {
       return contains(c['nome']) ||
           contains(c['tel']) ||
@@ -51,7 +66,8 @@ class _HomeGestorState extends State<HomeGestor> {
           contains(c['bairro']) ||
           contains(c['estab']) ||
           contains(c['cons']) ||
-          contains(c['obs']);
+          contains(c['obs']) ||
+          contains(c['status']);
     }).toList();
   }
 
@@ -105,6 +121,35 @@ class _HomeGestorState extends State<HomeGestor> {
     out = _cleanTail(out);
     out = out.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
     return out;
+  }
+
+  String _fmtStatus(String? raw) {
+    final s = (raw ?? '').trim().toLowerCase();
+    switch (s) {
+      case 'conexao':
+        return 'Conexão';
+      case 'negociacao':
+        return 'Negociação';
+      case 'conexao/negociacao':
+      case 'conexao_negociacao':
+      case 'conexao-negociacao':
+        return 'Conexão/Negociação';
+      default:
+        if (s.isEmpty) return '';
+        return s[0].toUpperCase() + s.substring(1);
+    }
+  }
+
+  String _maskFoneBR(String raw) {
+    final digits = (raw).replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '';
+    if (digits.length <= 10) {
+      final d = digits.padRight(10, '0');
+      return '(${d.substring(0, 2)}) ${d.substring(2, 6)}-${d.substring(6, 10)}';
+    } else {
+      final d = digits.padRight(11, '0');
+      return '(${d.substring(0, 2)}) ${d.substring(2, 7)}-${d.substring(7, 11)}';
+    }
   }
 
   @override
@@ -166,7 +211,7 @@ class _HomeGestorState extends State<HomeGestor> {
       final rows = await _sb
           .from('clientes')
           .select(
-              'id, nome, telefone, logradouro, endereco, numero, bairro, cidade, estabelecimento, data_visita, observacoes, consultor_uid_t')
+              'id, nome, telefone, logradouro, endereco, numero, bairro, cidade, estabelecimento, data_visita, observacoes, consultor_uid_t, status_negociacao')
           .inFilter('consultor_uid_t', consUids)
           .order('data_visita', ascending: false, nullsFirst: true)
           .range(start, end);
@@ -187,7 +232,7 @@ class _HomeGestorState extends State<HomeGestor> {
         batch.add({
           'id': id,
           'nome': r['nome'] ?? '',
-          'tel': r['telefone'] ?? '',
+          'tel': _maskFoneBR((r['telefone'] ?? '').toString()),
           'end': endFmt,
           'estab': (r['estabelecimento'] ?? '').toString().trim(),
           'bairro': r['bairro'] ?? '',
@@ -197,10 +242,12 @@ class _HomeGestorState extends State<HomeGestor> {
           'dias': _calcDias(r['data_visita']),
           'urgente': _isUrgente(r['data_visita']),
           'alerta': _isAlerta(r['data_visita']),
+          'status': _fmtStatus(r['status_negociacao']),
         });
       }
 
-      final uids = batch.map((e) => e['consUid']).where((e) => e != null).toSet().cast<String>().toList();
+      final uids =
+          batch.map((e) => e['consUid']).where((e) => e != null).toSet().cast<String>().toList();
       if (uids.isNotEmpty) {
         final consRows = await _sb.from('consultores').select('uid, nome').inFilter('uid', uids);
         final map = <String, String>{};
@@ -370,7 +417,11 @@ class _HomeGestorState extends State<HomeGestor> {
                 index: _tab,
                 controller: _pageController,
                 onChanged: (i) {
-                  _pageController.animateToPage(i, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+                  _pageController.animateToPage(
+                    i,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                  );
                   setState(() => _tab = i);
                 },
               ),
@@ -424,27 +475,36 @@ class _HomeGestorState extends State<HomeGestor> {
         _leads[index] = {
           ..._leads[index],
           'nome': result['nome'],
-          'tel': result['telefone'],
+          'tel': _maskFoneBR(result['telefone'] ?? ''),
           'end': novoEnd,
           'bairro': result['bairro'],
           'dias': result['diasPAP'],
           'obs': result['observacoes'],
           'estab': result['estabelecimento'] ?? _leads[index]['estab'],
+          'status': result['status_negociacao'] != null
+              ? _fmtStatus(result['status_negociacao'])
+              : _leads[index]['status'],
         };
       });
 
       try {
-        await _sb.from('clientes').update({
-          'nome': result['nome'],
-          'telefone': result['telefone'],
-          'logradouro': result['logradouro'],
-          'endereco': result['endereco'],
-          'numero': result['numero'],
-          'bairro': result['bairro'],
-          'cidade': result['cidade'],
-          'estabelecimento': result['estabelecimento'],
-          'observacoes': result['observacoes'],
-        }).eq('id', _leads[index]['id']).select();
+        await _sb
+            .from('clientes')
+            .update({
+              'nome': result['nome'],
+              'telefone': result['telefone'], 
+              'logradouro': result['logradouro'],
+              'endereco': result['endereco'],
+              'numero': result['numero'],
+              'bairro': result['bairro'],
+              'cidade': result['cidade'],
+              'estabelecimento': result['estabelecimento'],
+              'observacoes': result['observacoes'],
+              if (result['status_negociacao'] != null)
+                'status_negociacao': result['status_negociacao'],
+            })
+            .eq('id', _leads[index]['id'])
+            .select();
       } catch (_) {}
     }
   }
@@ -457,7 +517,8 @@ class _HomeGestorState extends State<HomeGestor> {
         lead: TLCliente(id: c['id'], nome: c['nome'], telefone: c['tel']),
         consultorAtualNome: (c['cons'] as String?) ?? '-',
         onConfirmar: (novoUid) async {
-          final res = await _sb.from('clientes').update({'consultor_uid_t': novoUid}).eq('id', c['id']).select();
+          final res =
+              await _sb.from('clientes').update({'consultor_uid_t': novoUid}).eq('id', c['id']).select();
           if (res == null || res is! List || res.isEmpty) {
             throw Exception('Sem permissão para transferir este lead (RLS/escopo).');
           }
@@ -467,7 +528,8 @@ class _HomeGestorState extends State<HomeGestor> {
       ),
     );
     if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lead transferido com sucesso')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Lead transferido com sucesso')));
     }
   }
 }
@@ -529,7 +591,9 @@ class _LeadsTab extends StatelessWidget {
       },
       child: NotificationListener<ScrollNotification>(
         onNotification: (n) {
-          if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200 && hasMore && !loadingMore) {
+          if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200 &&
+              hasMore &&
+              !loadingMore) {
             onCarregarMais(initial: false);
           }
           return false;
@@ -537,7 +601,6 @@ class _LeadsTab extends StatelessWidget {
         child: ListView.separated(
           key: ValueKey('tab_leads_${expandirTodos ? 'all' : 'top10'}'),
           padding: const EdgeInsets.only(top: 0, bottom: 80),
-          // sem header "resultado(s)"
           itemCount: (itemCount == 0 ? 0 : itemCount),
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, idx) {
@@ -555,6 +618,7 @@ class _LeadsTab extends StatelessWidget {
                   dias: (c['dias'] as int?) ?? 0,
                   urgente: (c['urgente'] as bool?) ?? false,
                   alerta: (c['alerta'] as bool?) ?? false,
+                  status: (c['status'] as String?) ?? '',
                   onEditar: () => onEditar(c, idx),
                   onTransferir: () => onTransferir(c),
                 );
@@ -565,7 +629,8 @@ class _LeadsTab extends StatelessWidget {
                 return renderCard(c);
               }
               if (idx == 10) {
-                return _CardVerMais(restante: total - 10, onTap: () => setExpandirTodos(true));
+                return _CardVerMais(
+                    restante: total - 10, onTap: () => setExpandirTodos(true));
               }
             }
 
@@ -605,7 +670,14 @@ class _CardVerMais extends StatelessWidget {
             child: Row(
               children: const [
                 Expanded(
-                  child: Text('Ver mais', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: texto)),
+                  child: Text(
+                    'Ver mais',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: texto,
+                    ),
+                  ),
                 ),
               ],
             ),
