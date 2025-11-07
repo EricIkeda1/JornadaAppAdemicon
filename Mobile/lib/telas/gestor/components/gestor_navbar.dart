@@ -53,11 +53,7 @@ class _GestorNavbarState extends State<GestorNavbar> {
       }
       final uid = user.id;
 
-      final data = await _sb
-          .from('gestor')
-          .select('nome')
-          .eq('id', uid)
-          .maybeSingle();
+      final data = await _sb.from('gestor').select('nome').eq('id', uid).maybeSingle();
 
       final nomeBanco = (data != null ? data['nome'] as String? : null) ?? user.email ?? 'Gestor';
 
@@ -99,7 +95,6 @@ class _GestorNavbarState extends State<GestorNavbar> {
                   fit: BoxFit.contain,
                 ),
               ),
-
               Row(
                 children: [
                   const SizedBox(width: 8),
@@ -134,32 +129,40 @@ class _GestorNavbarState extends State<GestorNavbar> {
                     ],
                   ),
                   const Spacer(),
+                  // Botão "Sair" branco, quadradinho
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                       onTap: _goLogin,
-                      hoverColor: const Color(0x0F000000),
+                      hoverColor: const Color(0x0F000000), // leve highlight neutro
                       child: Container(
-                        height: 32,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        height: 30,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
-                          color: branco,
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,                       // branco como a navbar
+                          borderRadius: BorderRadius.circular(8),     // quadradinho
                           border: Border.all(color: corBorda, width: 1.1),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0D000000), // sombra bem sutil
+                              blurRadius: 3,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(Icons.logout_outlined, size: 17, color: corTexto),
+                            Icon(Icons.logout_outlined, size: 16, color: corTexto),
                             SizedBox(width: 6),
                             Text(
                               'Sair',
                               style: TextStyle(
                                 color: corTexto,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.1,
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.15,
                               ),
                             ),
                           ],

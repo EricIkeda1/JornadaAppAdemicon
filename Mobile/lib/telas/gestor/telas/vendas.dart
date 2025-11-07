@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../components/editar_periodo.dart';
 
 class VendasPage extends StatefulWidget {
   const VendasPage({super.key});
@@ -11,16 +12,19 @@ class VendasPage extends StatefulWidget {
 
 class _VendasPageState extends State<VendasPage>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // anima só na primeira visita após abrir app
   static bool _jaAnimouUmaVezGlobal = false;
 
   final SupabaseClient _client = Supabase.instance.client;
   RealtimeChannel? _chan;
 
+  // KPIs finais
   double totalVendas = 0;
   double mediaMensal = 0;
   double melhorMesValor = 0;
   int periodoMeses = 6;
 
+  // KPIs animados
   double animTotal = 0;
   double animMedia = 0;
   double animMelhor = 0;
@@ -28,6 +32,7 @@ class _VendasPageState extends State<VendasPage>
 
   late final AnimationController _kpiCtrl;
 
+  // Série do gráfico
   List<String> meses = [];
   List<double> realizado = [];
 
@@ -72,11 +77,38 @@ class _VendasPageState extends State<VendasPage>
     } catch (_) {}
   }
 
+  Future<void> _abrirEditarPeriodo() async {
+    final novo = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        int sel = periodoMeses;
+        return EditarPeriodoSheet(
+          selecionado: periodoMeses,
+          onSelecionar: (m) {
+            sel = m;
+            Navigator.pop(ctx, sel);
+          },
+        );
+      },
+    );
+
+    if (novo != null && novo != periodoMeses && mounted) {
+      setState(() => periodoMeses = novo);
+      await _carregarDados(animarSeNecessario: false); // não reanima ao trocar período
+    }
+  }
+
   Future<void> _carregarDados({bool animarSeNecessario = true}) async {
     try {
       final uidGestor = _client.auth.currentUser?.id;
       if (uidGestor == null) return;
 
+      // 1) Consultores ativos do time
       final cons = await _client
           .from('consultores')
           .select('uid, data_cadastro')
@@ -90,6 +122,7 @@ class _VendasPageState extends State<VendasPage>
               .toList()
           : <String>[];
 
+      // Menor data_cadastro
       DateTime? inicioTime;
       if (cons is List && cons.isNotEmpty) {
         for (final e in cons) {
@@ -101,6 +134,7 @@ class _VendasPageState extends State<VendasPage>
         }
       }
 
+      // 2) Agregar vendas finalizadas do time
       Map<String, double> somaMes = {};
       DateTime? primeiraVenda;
 
@@ -136,11 +170,13 @@ class _VendasPageState extends State<VendasPage>
         }
       }
 
+      // 3) “Primeira barra”: mínimo entre cadastro e primeira venda
       DateTime? inicioSerie = inicioTime;
       if (inicioSerie == null || (primeiraVenda != null && primeiraVenda!.isBefore(inicioSerie))) {
         inicioSerie = primeiraVenda;
       }
 
+      // Sem base
       if (inicioSerie == null) {
         if (mounted) {
           setState(() {
@@ -159,22 +195,15 @@ class _VendasPageState extends State<VendasPage>
         return;
       }
 
-      final now = DateTime.now();
+      // 4) Janela FIXA de `periodoMeses` iniciando exatamente na primeira barra
       final abrev = DateFormat('MMM', 'pt_BR');
       String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
-      DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
-      DateTime end = DateTime(start.year, start.month + 5, 1);
-
-      final present = DateTime(now.year, now.month, 1);
-      if (end.isAfter(present)) {
-        end = present;
-        start = DateTime(end.year, end.month - 5, 1);
-      }
+      final DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
+      final DateTime end = DateTime(start.year, start.month + (periodoMeses - 1), 1);
 
       final List<String> ms = [];
       final List<double> rl = [];
-
       DateTime cursor = start;
       while (!cursor.isAfter(end)) {
         final key = fmtKey(cursor);
@@ -183,27 +212,30 @@ class _VendasPageState extends State<VendasPage>
         cursor = DateTime(cursor.year, cursor.month + 1, 1);
       }
 
-      while (ms.length < 6) {
-        final next = DateTime(end.year, end.month + (ms.length - 5), 1);
+      // Sanidade: exatamente `periodoMeses`
+      while (ms.length < periodoMeses) {
+        final next = DateTime(end.year, end.month + (ms.length - (periodoMeses - 1)), 1);
         ms.add(abrev.format(next));
         rl.add(0.0);
       }
-      if (ms.length > 6) {
-        ms.removeRange(0, ms.length - 6);
-        rl.removeRange(0, rl.length - 6);
+      if (ms.length > periodoMeses) {
+        ms.removeRange(0, ms.length - periodoMeses);
+        rl.removeRange(0, rl.length - periodoMeses);
       }
 
+      // 5) KPIs locais (ou substitua pela view vendas_kpis se preferir)
       if (mounted) {
         setState(() {
           meses = ms;
           realizado = rl;
           totalVendas = rl.fold<double>(0, (a, b) => a + b);
-          periodoMeses = rl.length; // sempre 6
+          periodoMeses = rl.length; // igual ao selecionado
           mediaMensal = periodoMeses == 0 ? 0 : totalVendas / periodoMeses;
           melhorMesValor = rl.isEmpty ? 0 : rl.reduce((a, b) => a > b ? a : b);
         });
       }
 
+      // 6) Animação só na primeira visita
       final deveAnimar = animarSeNecessario && !_jaAnimouUmaVezGlobal;
       if (deveAnimar) {
         _rodarAnimacaoKpis();
@@ -273,6 +305,7 @@ class _VendasPageState extends State<VendasPage>
             collapsedHeight: 0,
             expandedHeight: 0,
           ),
+          // Header com botão Editar Período
           SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
@@ -283,11 +316,33 @@ class _VendasPageState extends State<VendasPage>
                 ),
               ),
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _HeaderRow(
-                title: 'Dashboard de Vendas',
-                showConsultor: true,
-                primary: primary,
-                primaryLight: primaryLight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _HeaderRow(
+                      title: 'Dashboard de Vendas',
+                      showConsultor: true,
+                      primary: primary,
+                      primaryLight: primaryLight,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 34,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        side: const BorderSide(color: Color(0xFFDD3A3A)),
+                        foregroundColor: const Color(0xFFDD3A3A),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: _abrirEditarPeriodo,
+                      icon: const Icon(Icons.edit_calendar_outlined, size: 16),
+                      label: const Text('Editar Período'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -345,6 +400,8 @@ class _VendasPageState extends State<VendasPage>
     );
   }
 }
+
+// ==================== UI Auxiliares ====================
 
 class _HeaderRow extends StatelessWidget {
   final String title;
