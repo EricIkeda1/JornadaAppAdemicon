@@ -34,7 +34,6 @@ class VendasPage extends StatefulWidget {
 
 class _VendasPageState extends State<VendasPage>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  // Anima apenas uma vez por sessão de app
   static bool _jaAnimouUmaVezGlobal = false;
 
   final SupabaseClient _client = Supabase.instance.client;
@@ -45,7 +44,6 @@ class _VendasPageState extends State<VendasPage>
   double melhorMesValor = 0;
   int periodoMeses = 6;
 
-  // Valores animados
   double animTotal = 0;
   double animMedia = 0;
   double animMelhor = 0;
@@ -273,8 +271,8 @@ class _VendasPageState extends State<VendasPage>
               final v = switch (rawValor) {
                 num n => n.toDouble(),
                 String s =>
-                  double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ??
-                      0.0,
+                    double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ??
+                        0.0,
                 _ => 0.0,
               };
 
@@ -490,14 +488,15 @@ class _VendasPageState extends State<VendasPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
     final headerTitle = isIndividual ? 'Dashboard do Consultor' : 'Dashboard de Vendas';
-    final headerSubtitle = isIndividual
-        ? (consultorNome != null && consultorNome!.isNotEmpty
-            ? 'Consultor: $consultorNome'
-            : 'Consultor selecionado')
-        : '';
+    final String nomeVisivel = (consultorNome != null && consultorNome!.trim().isNotEmpty)
+        ? consultorNome!.trim()
+        : 'Consultor selecionado';
+
+    final headerSubtitle = isIndividual ? 'Consultor: $nomeVisivel' : '';
     final chartSubtitle = isIndividual
-        ? 'Somente vendas finalizadas - Consultor'
+        ? 'Somente vendas finalizadas - Consultor • $nomeVisivel'
         : 'Somente vendas finalizadas - Meu time';
 
     return Scaffold(
@@ -587,7 +586,7 @@ class _VendasPageState extends State<VendasPage>
                         valueWidget: DigitCurrency(
                           value: animTotal,
                           format: _moedaFmt,
-                          animate: false, // já animamos no DigitRoller interno
+                          animate: false, 
                           textStyleBuilder: (context) => Theme.of(context)
                               .textTheme
                               .titleMedium
@@ -664,8 +663,6 @@ class _VendasPageState extends State<VendasPage>
   }
 }
 
-/* -------------------- HEADER E LAYOUT -------------------- */
-
 class _HeaderRow extends StatelessWidget {
   final String title;
   final bool showConsultor;
@@ -721,12 +718,21 @@ class _HeaderRow extends StatelessWidget {
               ),
               if (showConsultor) ...[
                 const SizedBox(height: 2),
-                Text(
-                  consultorText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: Colors.black54, fontWeight: FontWeight.w500),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.person_pin_circle_rounded, size: 16, color: Colors.black45),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        consultorText, 
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: Colors.black54, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -951,8 +957,6 @@ class _KpiPeriodCard extends StatelessWidget {
   }
 }
 
-/* -------------------- CHART -------------------- */
-
 class _ChartCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -1065,12 +1069,10 @@ class _BarrasVendasChart extends StatelessWidget {
   }
 }
 
-/* -------------------- DIGIT ROLLER (cassino) -------------------- */
-
 enum RollBehavior { noRoll, rollOnce }
 
 class DigitRoller extends StatefulWidget {
-  final String text; // somente dígitos para rolar; outros caracteres ficam estáticos
+  final String text;
   final TextStyle? style;
   final Duration duration;
   final Curve curve;
@@ -1110,11 +1112,9 @@ class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStat
   @override
   void didUpdateWidget(covariant DigitRoller oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // se o texto mudar, decide se roda de novo (apenas se rollOnce e era noRoll para 1ª vez)
     if (widget.text != _lastRendered) {
       _lastRendered = widget.text;
       if (widget.rollBehavior == RollBehavior.rollOnce) {
-        // não repetir: se já completou uma vez, deixa em 1
         if (_ctrl.status == AnimationStatus.completed) {
           _ctrl.value = 1;
         } else {
@@ -1150,8 +1150,7 @@ class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStat
               return Text(ch, style: style);
             }
             final digit = int.tryParse(ch) ?? 0;
-            // valor rolando de 0..digit, com loops completos para dar "efeito cassino"
-            final loops = 1; // ajuste para 2+ para mais "barulho"
+            final loops = 1; 
             final progress = _anim.value;
             final value = ((progress * (10 * loops + digit)) % 10).round() % 10;
             return SizedBox(
@@ -1165,7 +1164,6 @@ class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStat
   }
 }
 
-// Componente que formata moeda e aplica DigitRoller só nos dígitos
 class DigitCurrency extends StatelessWidget {
   final double value;
   final NumberFormat format;
@@ -1187,9 +1185,7 @@ class DigitCurrency extends StatelessWidget {
     final txt = format.format(value);
     final style = textStyleBuilder(context);
     if (!animate) {
-      // Mesmo sem animar valor numérico, usamos DigitRoller quando rollBehavior != noRoll
     }
-    // separa em dígitos e não-dígitos preservando pontuação e símbolo
     final parts = txt.characters.toList();
     return Wrap(
       children: parts.map((ch) {
@@ -1201,7 +1197,7 @@ class DigitCurrency extends StatelessWidget {
           );
         }
         return Text(ch, style: style);
-      }).toList(),
+    }).toList(),
     );
   }
 }
