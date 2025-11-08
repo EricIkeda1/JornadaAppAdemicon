@@ -12,15 +12,21 @@ const _muted = Color(0xFF8F8F95);
 
 class BrPhoneTextInputFormatter extends TextInputFormatter {
   const BrPhoneTextInputFormatter();
+
+  static final _digitsOnly = RegExp(r'\D');
+
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final isCell = digits.length > 10;
-    final mask = isCell ? '(##) #####-####' : '(##) ####-####';
-    final masked = _applyMask(digits, mask);
-    final cursor = masked.length.clamp(0, masked.length);
-    return TextEditingValue(text: masked, selection: TextSelection.collapsed(offset: cursor));
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.replaceAll(_digitsOnly, '');
+    final String mask = raw.length > 10 ? '(##) #####-####' : '(##) ####-####';
+    final formatted = _applyMask(raw, mask);
+    final sel = TextSelection.collapsed(offset: formatted.length);
+    return TextEditingValue(text: formatted, selection: sel, composing: TextRange.empty);
   }
+
   String _applyMask(String digits, String mask) {
     final buf = StringBuffer();
     int i = 0;
@@ -29,6 +35,13 @@ class BrPhoneTextInputFormatter extends TextInputFormatter {
       if (ch == '#') { buf.write(digits[i]); i++; } else { buf.write(ch); }
     }
     return buf.toString();
+  }
+
+  String formatStatic(String input) {
+    final raw = input.replaceAll(_digitsOnly, '');
+    if (raw.isEmpty) return '';
+    final mask = raw.length > 10 ? '(##) #####-####' : '(##) ####-####';
+    return _applyMask(raw, mask);
   }
 }
 
@@ -102,7 +115,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
         ));
 
     setState(() {
-      _consultores.addAll(mapped);
+      _consultores.addAll(mapped.toList());
       _visibleCount = _consultores.length;
     });
   }
@@ -234,6 +247,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
                 ..._consultores.map(
                   (c) => _ConsultorCard(
                     c: c,
+                    phoneFmt: _phoneFmt,
                     onEditar: () => _openEditarConsultor(c),
                     onApagar: () => _confirmarExcluir(c),
                   ),
@@ -266,17 +280,20 @@ class _ConsultorView {
 
 class _ConsultorCard extends StatelessWidget {
   final _ConsultorView c;
+  final BrPhoneTextInputFormatter phoneFmt;
   final VoidCallback onEditar;
   final VoidCallback onApagar;
   const _ConsultorCard({
     super.key,
     required this.c,
+    required this.phoneFmt,
     required this.onEditar,
     required this.onApagar,
   });
 
   @override
   Widget build(BuildContext context) {
+    final fone = phoneFmt.formatStatic(c.telefone);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -298,6 +315,13 @@ class _ConsultorCard extends StatelessWidget {
                 Expanded(child: _NomeMatricula(nome: c.nome, matricula: c.matricula)),
                 Row(
                   children: [
+                    PillButton(
+                      onPressed: null,
+                      icon: const Icon(Icons.list_alt_outlined, size: 16, color: _brandRed),
+                      label: 'Status',
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    const SizedBox(width: 8),
                     PillIconButton(
                       onPressed: onEditar,
                       icon: Icons.edit_outlined,
@@ -320,7 +344,7 @@ class _ConsultorCard extends StatelessWidget {
               children: [
                 const Icon(Icons.phone, size: 16, color: _muted),
                 const SizedBox(width: 6),
-                Text(c.telefone, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14)),
+                Text(fone.isEmpty ? '—' : fone, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14)),
               ],
             ),
             const SizedBox(height: 6),
@@ -484,7 +508,8 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
   void initState() {
     super.initState();
     _nomeCtrl = TextEditingController(text: widget.consultor.nome);
-    _telCtrl = TextEditingController(text: widget.consultor.telefone);
+    final fmt = const BrPhoneTextInputFormatter();
+    _telCtrl = TextEditingController(text: fmt.formatStatic(widget.consultor.telefone));
     _emailCtrl = TextEditingController(text: widget.consultor.email);
     _matCtrl = TextEditingController(text: widget.consultor.matricula.isEmpty ? '' : widget.consultor.matricula);
   }
@@ -565,8 +590,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                         Row(
                           children: [
                             Container(
-                              width: 40, 
-                              height: 40,
+                              width: 40, height: 40,
                               decoration: BoxDecoration(color: const Color(0xFFFFECEA), borderRadius: BorderRadius.circular(10)),
                               child: const Icon(Icons.edit, color: _brandRed),
                             ),
@@ -665,12 +689,9 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                                     gradient: const LinearGradient(
                                       colors: [_brandRed, _brandRedDark],
                                       begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                    ),
+                                      end: Alignment.centerRight),
                                     borderRadius: BorderRadius.circular(12),
-                                    boxShadow: const [
-                                      BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3)),
-                                    ],
+                                    boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
                                   ),
                                   child: ElevatedButton.icon(
                                     onPressed: _saving ? null : _save,
@@ -803,9 +824,7 @@ class _ConfirmExcluirDialog extends StatelessWidget {
                         end: Alignment.centerRight,
                       ),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3)),
-                      ],
+                      boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).pop(true),
