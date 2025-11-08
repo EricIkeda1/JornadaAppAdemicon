@@ -34,6 +34,7 @@ class VendasPage extends StatefulWidget {
 
 class _VendasPageState extends State<VendasPage>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // Anima apenas uma vez por sessão de app
   static bool _jaAnimouUmaVezGlobal = false;
 
   final SupabaseClient _client = Supabase.instance.client;
@@ -44,6 +45,7 @@ class _VendasPageState extends State<VendasPage>
   double melhorMesValor = 0;
   int periodoMeses = 6;
 
+  // Valores animados
   double animTotal = 0;
   double animMedia = 0;
   double animMelhor = 0;
@@ -62,7 +64,9 @@ class _VendasPageState extends State<VendasPage>
   String? consultorUid;
   String? consultorNome;
 
-  String moeda(double v) => NumberFormat.simpleCurrency(locale: 'pt_BR').format(v);
+  final NumberFormat _moedaFmt = NumberFormat.simpleCurrency(locale: 'pt_BR');
+
+  String moeda(double v) => _moedaFmt.format(v);
 
   @override
   bool get wantKeepAlive => true;
@@ -72,7 +76,8 @@ class _VendasPageState extends State<VendasPage>
   @override
   void initState() {
     super.initState();
-    _kpiCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+    _kpiCtrl =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     VendasPage._notifySelection = _onSelectedConsultorStatic;
     _inscreverRealtime();
   }
@@ -112,7 +117,8 @@ class _VendasPageState extends State<VendasPage>
         consultorId = sel['consultorId'];
         consultorUid = sel['consultorUid'];
         consultorNome = sel['nomeConsultor'];
-        isIndividual = (consultorUid?.isNotEmpty == true) || (consultorId?.isNotEmpty == true);
+        isIndividual = (consultorUid?.isNotEmpty == true) ||
+            (consultorId?.isNotEmpty == true);
       }
       _limparEstado();
     });
@@ -129,7 +135,8 @@ class _VendasPageState extends State<VendasPage>
       consultorId = args['consultorId']?.toString();
       consultorUid = args['consultorUid']?.toString();
       consultorNome = args['nomeConsultor']?.toString();
-      isIndividual = (consultorUid?.isNotEmpty == true) || (consultorId?.isNotEmpty == true);
+      isIndividual = (consultorUid?.isNotEmpty == true) ||
+          (consultorId?.isNotEmpty == true);
       _limparEstado();
       _carregarDados(animarSeNecessario: false);
       _argsAplicados = true;
@@ -141,7 +148,8 @@ class _VendasPageState extends State<VendasPage>
       consultorId = sel['consultorId'];
       consultorUid = sel['consultorUid'];
       consultorNome = sel['nomeConsultor'];
-      isIndividual = (consultorUid?.isNotEmpty == true) || (consultorId?.isNotEmpty == true);
+      isIndividual = (consultorUid?.isNotEmpty == true) ||
+          (consultorId?.isNotEmpty == true);
       _limparEstado();
       _carregarDados(animarSeNecessario: false);
       _argsAplicados = true;
@@ -220,7 +228,10 @@ class _VendasPageState extends State<VendasPage>
             .eq('ativo', true);
 
         final List<String> uids = (cons is List)
-            ? cons.map((e) => (e['uid'] ?? '').toString()).where((s) => s.isNotEmpty).toList()
+            ? cons
+                .map((e) => (e['uid'] ?? '').toString())
+                .where((s) => s.isNotEmpty)
+                .toList()
             : <String>[];
 
         DateTime? inicioTime;
@@ -229,7 +240,8 @@ class _VendasPageState extends State<VendasPage>
             final dc = e['data_cadastro'];
             final dt = dc == null ? null : DateTime.tryParse(dc.toString());
             if (dt != null) {
-              inicioTime = (inicioTime == null || dt.isBefore(inicioTime!)) ? dt : inicioTime;
+              inicioTime =
+                  (inicioTime == null || dt.isBefore(inicioTime!)) ? dt : inicioTime;
             }
           }
         }
@@ -246,7 +258,8 @@ class _VendasPageState extends State<VendasPage>
               .filter('consultor_uid_t', 'in', '($valores)')
               .order('data_visita', ascending: true);
 
-          String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+          String fmtKey(DateTime d) =>
+              '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
           if (vendas is List) {
             for (final row in vendas) {
@@ -259,7 +272,9 @@ class _VendasPageState extends State<VendasPage>
               final rawValor = row['valor_proposta'];
               final v = switch (rawValor) {
                 num n => n.toDouble(),
-                String s => double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
+                String s =>
+                  double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ??
+                      0.0,
                 _ => 0.0,
               };
 
@@ -270,7 +285,8 @@ class _VendasPageState extends State<VendasPage>
         }
 
         DateTime? inicioSerie = inicioTime;
-        if (inicioSerie == null || (primeiraVenda != null && primeiraVenda!.isBefore(inicioSerie))) {
+        if (inicioSerie == null ||
+            (primeiraVenda != null && primeiraVenda!.isBefore(inicioSerie))) {
           inicioSerie = primeiraVenda;
         }
 
@@ -290,10 +306,12 @@ class _VendasPageState extends State<VendasPage>
         }
 
         final abrev = DateFormat('MMM', 'pt_BR');
-        String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+        String fmtKey(DateTime d) =>
+            '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
         final DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
-        final DateTime end = DateTime(start.year, start.month + (periodoMeses - 1), 1);
+        final DateTime end =
+            DateTime(start.year, start.month + (periodoMeses - 1), 1);
 
         final List<String> ms = [];
         final List<double> rl = [];
@@ -306,7 +324,8 @@ class _VendasPageState extends State<VendasPage>
         }
 
         while (ms.length < periodoMeses) {
-          final next = DateTime(end.year, end.month + (ms.length - (periodoMeses - 1)), 1);
+          final next =
+              DateTime(end.year, end.month + (ms.length - (periodoMeses - 1)), 1);
           ms.add(abrev.format(next));
           rl.add(0.0);
         }
@@ -330,7 +349,9 @@ class _VendasPageState extends State<VendasPage>
         final String filtroColuna = temUid ? 'consultor_uid_t' : 'consultor_id';
         final String? filtroValorOpt = temUid ? consultorUid : consultorId;
         final String? filtroValorStr =
-            (filtroValorOpt == null || filtroValorOpt.isEmpty) ? null : filtroValorOpt;
+            (filtroValorOpt == null || filtroValorOpt.isEmpty)
+                ? null
+                : filtroValorOpt;
 
         if (filtroValorStr == null) {
           if (mounted) {
@@ -357,7 +378,8 @@ class _VendasPageState extends State<VendasPage>
         Map<String, double> somaMes = {};
         DateTime? primeiraVenda;
 
-        String fmtKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+        String fmtKey(DateTime d) =>
+            '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
         if (vendas is List) {
           for (final row in vendas) {
@@ -370,7 +392,9 @@ class _VendasPageState extends State<VendasPage>
             final rawValor = row['valor_proposta'];
             final v = switch (rawValor) {
               num n => n.toDouble(),
-              String s => double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0.0,
+              String s =>
+                  double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ??
+                      0.0,
               _ => 0.0,
             };
 
@@ -385,7 +409,8 @@ class _VendasPageState extends State<VendasPage>
 
         final DateFormat abrev = DateFormat('MMM', 'pt_BR');
         final DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
-        final DateTime end = DateTime(start.year, start.month + (periodoMeses - 1), 1);
+        final DateTime end =
+            DateTime(start.year, start.month + (periodoMeses - 1), 1);
 
         final List<String> ms = [];
         final List<double> rl = [];
@@ -511,7 +536,6 @@ class _VendasPageState extends State<VendasPage>
                     ),
                   ),
                   const SizedBox(width: 8),
-
                   if (isIndividual)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -522,7 +546,8 @@ class _VendasPageState extends State<VendasPage>
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             side: const BorderSide(color: Color(0xFF9E9E9E)),
                             foregroundColor: const Color(0xFF424242),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: _voltarAoDashboard,
                           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
@@ -530,7 +555,6 @@ class _VendasPageState extends State<VendasPage>
                         ),
                       ),
                     ),
-
                   SizedBox(
                     height: 34,
                     child: OutlinedButton.icon(
@@ -538,7 +562,8 @@ class _VendasPageState extends State<VendasPage>
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         side: const BorderSide(color: Color(0xFFDD3A3A)),
                         foregroundColor: const Color(0xFFDD3A3A),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: _abrirEditarPeriodo,
                       icon: const Icon(Icons.edit_calendar_outlined, size: 16),
@@ -559,27 +584,62 @@ class _VendasPageState extends State<VendasPage>
                     children: [
                       _BigKpiCard(
                         title: 'Total Vendas',
-                        value: moeda(animTotal),
+                        valueWidget: DigitCurrency(
+                          value: animTotal,
+                          format: _moedaFmt,
+                          animate: false, // já animamos no DigitRoller interno
+                          textStyleBuilder: (context) => Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+                        ),
                         icon: Icons.attach_money_rounded,
                         gradient: LinearGradient(
                           colors: [primary, primaryLight],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
+                        rolling: !_jaAnimouUmaVezGlobal ? RollBehavior.rollOnce : RollBehavior.noRoll,
                       ),
                       _KpiCard(
                         title: 'Média Mensal',
-                        value: moeda(animMedia),
+                        valueWidget: DigitCurrency(
+                          value: animMedia,
+                          format: _moedaFmt,
+                          animate: false,
+                          textStyleBuilder: (context) => Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: const Color(0xFF222222), fontWeight: FontWeight.w800),
+                        ),
                         icon: Icons.track_changes_rounded,
+                        rolling: !_jaAnimouUmaVezGlobal ? RollBehavior.rollOnce : RollBehavior.noRoll,
                       ),
                       _KpiCard(
                         title: 'Melhor Mês',
-                        value: moeda(animMelhor),
+                        valueWidget: DigitCurrency(
+                          value: animMelhor,
+                          format: _moedaFmt,
+                          animate: false,
+                          textStyleBuilder: (context) => Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: const Color(0xFF222222), fontWeight: FontWeight.w800),
+                        ),
                         icon: Icons.emoji_events_outlined,
+                        rolling: !_jaAnimouUmaVezGlobal ? RollBehavior.rollOnce : RollBehavior.noRoll,
                       ),
-                      _KpiCard(
+                      _KpiPeriodCard(
                         title: 'Período',
-                        value: '${animPeriodo.toStringAsFixed(0)} meses',
+                        valueWidget: DigitRoller(
+                          text: '${animPeriodo.toStringAsFixed(0)}',
+                          rollBehavior: !_jaAnimouUmaVezGlobal ? RollBehavior.rollOnce : RollBehavior.noRoll,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: const Color(0xFF222222), fontWeight: FontWeight.w800),
+                        ),
+                        suffix: ' meses',
                         icon: Icons.event_note_outlined,
                       ),
                     ],
@@ -603,6 +663,8 @@ class _VendasPageState extends State<VendasPage>
     );
   }
 }
+
+/* -------------------- HEADER E LAYOUT -------------------- */
 
 class _HeaderRow extends StatelessWidget {
   final String title;
@@ -630,8 +692,13 @@ class _HeaderRow extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(colors: [primary, primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))],
+            gradient: LinearGradient(
+                colors: [primary, primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight),
+            boxShadow: const [
+              BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))
+            ],
           ),
           child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 22),
         ),
@@ -658,7 +725,8 @@ class _HeaderRow extends StatelessWidget {
                   consultorText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.black54, fontWeight: FontWeight.w500),
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: Colors.black54, fontWeight: FontWeight.w500),
                 ),
               ],
             ],
@@ -706,16 +774,14 @@ const double _valueBottom = 16;
 class _KpiLayoutFixed extends StatelessWidget {
   final Widget icon;
   final String title;
-  final String value;
+  final Widget valueWidget;
   final Color titleColor;
-  final Color valueColor;
 
   const _KpiLayoutFixed({
     required this.icon,
     required this.title,
-    required this.value,
+    required this.valueWidget,
     required this.titleColor,
-    required this.valueColor,
   });
 
   @override
@@ -723,9 +789,28 @@ class _KpiLayoutFixed extends StatelessWidget {
     final t = Theme.of(context);
     return Stack(
       children: [
-        Positioned(top: _iconTop, left: _iconLeft, child: SizedBox(height: 24, width: 24, child: FittedBox(child: icon))),
-        Positioned(top: _titleTop, left: _side, right: _side, child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.labelLarge?.copyWith(color: titleColor, fontWeight: FontWeight.w600))),
-        Positioned(left: _side, right: _side, bottom: _valueBottom, child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.textTheme.titleMedium?.copyWith(color: valueColor, fontWeight: FontWeight.w800))),
+        Positioned(
+            top: _iconTop,
+            left: _iconLeft,
+            child: SizedBox(height: 24, width: 24, child: FittedBox(child: icon))),
+        Positioned(
+          top: _titleTop,
+          left: _side,
+          right: _side,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: t.textTheme.labelLarge
+                ?.copyWith(color: titleColor, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Positioned(
+          left: _side,
+          right: _side,
+          bottom: _valueBottom,
+          child: valueWidget,
+        ),
       ],
     );
   }
@@ -733,9 +818,15 @@ class _KpiLayoutFixed extends StatelessWidget {
 
 class _KpiCard extends StatelessWidget {
   final String title;
-  final String value;
+  final Widget valueWidget;
   final IconData icon;
-  const _KpiCard({required this.title, required this.value, required this.icon});
+  final RollBehavior rolling;
+  const _KpiCard({
+    required this.title,
+    required this.valueWidget,
+    required this.icon,
+    this.rolling = RollBehavior.noRoll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -750,9 +841,8 @@ class _KpiCard extends StatelessWidget {
         child: _KpiLayoutFixed(
           icon: Icon(icon, color: const Color(0xFFDD3A3A), size: 26),
           title: title,
-          value: value,
           titleColor: Colors.black54,
-          valueColor: const Color(0xFF222222),
+          valueWidget: valueWidget,
         ),
       ),
     );
@@ -761,10 +851,17 @@ class _KpiCard extends StatelessWidget {
 
 class _BigKpiCard extends StatelessWidget {
   final String title;
-  final String value;
+  final Widget valueWidget;
   final IconData icon;
   final Gradient gradient;
-  const _BigKpiCard({required this.title, required this.value, required this.icon, required this.gradient});
+  final RollBehavior rolling;
+  const _BigKpiCard({
+    required this.title,
+    required this.valueWidget,
+    required this.icon,
+    required this.gradient,
+    this.rolling = RollBehavior.noRoll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -779,14 +876,82 @@ class _BigKpiCard extends StatelessWidget {
         child: _KpiLayoutFixed(
           icon: Icon(icon, color: Colors.white, size: 26),
           title: title,
-          value: value,
           titleColor: Colors.white70,
-          valueColor: Colors.white,
+          valueWidget: valueWidget,
         ),
       ),
     );
   }
 }
+
+class _KpiPeriodCard extends StatelessWidget {
+  final String title;
+  final Widget valueWidget;
+  final String suffix;
+  final IconData icon;
+  const _KpiPeriodCard({
+    required this.title,
+    required this.valueWidget,
+    required this.suffix,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Material(
+      color: Colors.white,
+      elevation: 1.5,
+      shadowColor: Colors.black12,
+      borderRadius: BorderRadius.circular(_r),
+      child: Container(
+        height: _cardH,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(_r)),
+        child: Stack(
+          children: [
+            Positioned(
+              top: _iconTop,
+              left: _iconLeft,
+              child: SizedBox(height: 24, width: 24, child: FittedBox(child: Icon(icon, color: const Color(0xFFDD3A3A), size: 26))),
+            ),
+            Positioned(
+              top: _titleTop,
+              left: _side,
+              right: _side,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: t.textTheme.labelLarge?.copyWith(color: Colors.black54, fontWeight: FontWeight.w600),
+              ),
+            ),
+            Positioned(
+              left: _side,
+              right: _side,
+              bottom: _valueBottom,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Flexible(child: valueWidget),
+                  const SizedBox(width: 6),
+                  Text(
+                    suffix,
+                    style: t.textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFF222222),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* -------------------- CHART -------------------- */
 
 class _ChartCard extends StatelessWidget {
   final String title;
@@ -896,6 +1061,147 @@ class _BarrasVendasChart extends StatelessWidget {
       ),
       swapAnimationDuration: Duration.zero,
       swapAnimationCurve: Curves.linear,
+    );
+  }
+}
+
+/* -------------------- DIGIT ROLLER (cassino) -------------------- */
+
+enum RollBehavior { noRoll, rollOnce }
+
+class DigitRoller extends StatefulWidget {
+  final String text; // somente dígitos para rolar; outros caracteres ficam estáticos
+  final TextStyle? style;
+  final Duration duration;
+  final Curve curve;
+  final RollBehavior rollBehavior;
+
+  const DigitRoller({
+    super.key,
+    required this.text,
+    this.style,
+    this.duration = const Duration(milliseconds: 900),
+    this.curve = Curves.easeOutCubic,
+    this.rollBehavior = RollBehavior.rollOnce,
+  });
+
+  @override
+  State<DigitRoller> createState() => _DigitRollerState();
+}
+
+class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+  String _lastRendered = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.duration);
+    _anim = CurvedAnimation(parent: _ctrl, curve: widget.curve);
+    if (widget.rollBehavior == RollBehavior.rollOnce) {
+      _ctrl.forward();
+    } else {
+      _ctrl.value = 1;
+    }
+    _lastRendered = widget.text;
+  }
+
+  @override
+  void didUpdateWidget(covariant DigitRoller oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // se o texto mudar, decide se roda de novo (apenas se rollOnce e era noRoll para 1ª vez)
+    if (widget.text != _lastRendered) {
+      _lastRendered = widget.text;
+      if (widget.rollBehavior == RollBehavior.rollOnce) {
+        // não repetir: se já completou uma vez, deixa em 1
+        if (_ctrl.status == AnimationStatus.completed) {
+          _ctrl.value = 1;
+        } else {
+          _ctrl
+            ..reset()
+            ..forward();
+        }
+      } else {
+        _ctrl.value = 1;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = widget.style ?? DefaultTextStyle.of(context).style;
+    final chars = widget.text.characters.toList();
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) {
+        return Wrap(
+          spacing: 0,
+          runSpacing: 0,
+          children: chars.map((ch) {
+            final isDigit = RegExp(r'[0-9]').hasMatch(ch);
+            if (!isDigit) {
+              return Text(ch, style: style);
+            }
+            final digit = int.tryParse(ch) ?? 0;
+            // valor rolando de 0..digit, com loops completos para dar "efeito cassino"
+            final loops = 1; // ajuste para 2+ para mais "barulho"
+            final progress = _anim.value;
+            final value = ((progress * (10 * loops + digit)) % 10).round() % 10;
+            return SizedBox(
+              height: style.fontSize != null ? style.fontSize! * 1.2 : null,
+              child: Text(value.toString(), style: style),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+// Componente que formata moeda e aplica DigitRoller só nos dígitos
+class DigitCurrency extends StatelessWidget {
+  final double value;
+  final NumberFormat format;
+  final bool animate;
+  final TextStyle? Function(BuildContext) textStyleBuilder;
+  final RollBehavior rollBehavior;
+
+  const DigitCurrency({
+    super.key,
+    required this.value,
+    required this.format,
+    required this.textStyleBuilder,
+    this.animate = true,
+    this.rollBehavior = RollBehavior.rollOnce,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final txt = format.format(value);
+    final style = textStyleBuilder(context);
+    if (!animate) {
+      // Mesmo sem animar valor numérico, usamos DigitRoller quando rollBehavior != noRoll
+    }
+    // separa em dígitos e não-dígitos preservando pontuação e símbolo
+    final parts = txt.characters.toList();
+    return Wrap(
+      children: parts.map((ch) {
+        if (RegExp(r'[0-9]').hasMatch(ch) && rollBehavior != RollBehavior.noRoll) {
+          return DigitRoller(
+            text: ch,
+            style: style,
+            rollBehavior: rollBehavior,
+          );
+        }
+        return Text(ch, style: style);
+      }).toList(),
     );
   }
 }
