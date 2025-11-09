@@ -4,7 +4,7 @@ import '../widgets/lead_card.dart' as widgets;
 import 'components/gestor_navbar.dart';
 import 'components/gestor_header_row.dart';
 import 'components/menu_inferior.dart';
-import 'components/notificacao.dart';
+import 'components/notificacao.dart'; 
 import 'components/editar.dart' as comps;
 import 'components/transferir_lead_dialog.dart';
 import 'telas/lista_consultor.dart' as cons;
@@ -89,8 +89,7 @@ class _HomeGestorState extends State<HomeGestor> {
   String _removeCommaBeforeTypesAnywhere(String s) {
     return s.replaceAll(
       RegExp(
-          r',\s*(?=(Av\.|R\.|Rod\.|Al\.|Trav\.|Avenida|Rua|Rodovia|Alameda|Travessa)\b)',
-          caseSensitive: false),
+          r',\s*(?=(Av\.|R\.|Rod\.|Al\.|Trav\.|Avenida|Rua|Rodovia|Alameda|Travessa)\b)'),
       ' ',
     );
   }
@@ -282,7 +281,6 @@ class _HomeGestorState extends State<HomeGestor> {
       if (!mounted) return;
       setState(() {
         _leads.addAll(batch);
-
         _leads.sort((a, b) {
           final da = (a['dias'] as int?) ?? -1;
           final db = (b['dias'] as int?) ?? -1;
@@ -393,7 +391,7 @@ class _HomeGestorState extends State<HomeGestor> {
                               shape: const RoundedRectangleBorder(
                                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                               ),
-                              builder: (ctx) => const AvisosSheetMock(),
+                              builder: (ctx) => const AvisosSheet(), 
                             ),
                             query: _query,
                             onQueryChanged: (value) => setState(() {
@@ -669,7 +667,7 @@ class _LeadsTab extends StatelessWidget {
                   observacao: c['obs'] as String,
                   dias: (c['dias'] as int?) ?? 0,
                   urgente: (c['urgente'] as bool?) ?? false,
-                  alerta: (c['alerta'] as bool?) ?? false, 
+                  alerta: (c['alerta'] as bool?) ?? false,
                   status: (c['status'] as String?) ?? '',
                   onEditar: () => onEditar(c, idx),
                   onTransferir: () => onTransferir(c),
