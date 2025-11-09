@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
@@ -6,14 +7,107 @@ import 'package:uuid/uuid.dart';
 import 'package:ademicon_app/models/cliente.dart';
 import 'package:ademicon_app/services/cliente_service.dart';
 import 'package:ademicon_app/services/notification_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 
-const kDanger = Color(0xFFF00000);      
-const kDangerHover = Color(0xFFE31214); 
+const String kCorreiosBaseUrl = 'https://apihom.correios.com.br'; 
+const String kCorreiosBearerToken = ''; 
+
+const kDanger = Color(0xFFF00000);
+const kDangerHover = Color(0xFFE31214);
 const kDangerPressed = Color(0xFF7D1315);
-const kInk = Color(0xFF231F20);       
-const kInk2 = Color(0xFF414042);        
-const kInkMuted = Color(0xFF939598);    
-const kDivider = Color(0xFFDCDCDC);   
+const kInk = Color(0xFF231F20);
+const kInk2 = Color(0xFF414042);
+const kInkMuted = Color(0xFF939598);
+const kDivider = Color(0xFFDCDCDC);
+
+class EnderecoCep {
+  final String? uf;
+  final String? cidade;
+  final String? bairro;
+  final String? logradouro;
+  final String? complemento;
+
+  const EnderecoCep({this.uf, this.cidade, this.bairro, this.logradouro, this.complemento});
+}
+
+class ViaCepService {
+  final http.Client _client;
+  ViaCepService({http.Client? client}) : _client = client ?? http.Client();
+
+  Future<EnderecoCep?> buscar(String cep8) async {
+    final uri = Uri.parse('https://viacep.com.br/ws/$cep8/json/');
+    final resp = await _client.get(uri);
+    if (resp.statusCode != 200) return null;
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    if (data['erro'] == true) return null;
+    return EnderecoCep(
+      uf: (data['uf'] ?? '').toString().toUpperCase(),
+      cidade: (data['localidade'] ?? '').toString(),
+      bairro: (data['bairro'] ?? '').toString(),
+      logradouro: (data['logradouro'] ?? '').toString(),
+      complemento: (data['complemento'] ?? '').toString(),
+    );
+  }
+}
+
+class CorreiosCepService {
+  final String baseUrl;
+  final String bearerToken;
+  final http.Client _client;
+
+  CorreiosCepService({
+    required this.baseUrl,
+    required this.bearerToken,
+    http.Client? client,
+  }) : _client = client ?? http.Client();
+
+  Future<EnderecoCep?> buscar(String cep8) async {
+    if (bearerToken.isEmpty) return null;
+    final uri = Uri.parse('$baseUrl/cep/v1/enderecos/$cep8'); 
+    final resp = await _client.get(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $bearerToken',
+        'Accept': 'application/json',
+      },
+    );
+    if (resp.statusCode == 401 || resp.statusCode == 403) return null;
+    if (resp.statusCode != 200) return null;
+
+    final data = jsonDecode(resp.body);
+    final Map<String, dynamic> map;
+    if (data is Map<String, dynamic>) {
+      map = data;
+    } else if (data is List && data.isNotEmpty && data.first is Map<String, dynamic>) {
+      map = data.first as Map<String, dynamic>;
+    } else {
+      return null;
+    }
+
+    String? uf = _readString(map, ['uf', 'estado', 'siglaUf']);
+    String? cidade = _readString(map, ['localidade', 'cidade', 'municipio', 'nomeMunicipio']);
+    String? bairro = _readString(map, ['bairro', 'distrito']);
+    String? logradouro = _readString(map, ['logradouro', 'endereco', 'nomeLogradouro']);
+    String? complemento = _readString(map, ['complemento']);
+
+    return EnderecoCep(
+      uf: (uf ?? '').toUpperCase(),
+      cidade: cidade,
+      bairro: bairro,
+      logradouro: logradouro,
+      complemento: complemento,
+    );
+  }
+
+  static String? _readString(Map<String, dynamic> m, List<String> keys) {
+    for (final k in keys) {
+      final v = m[k];
+      if (v is String && v.trim().isNotEmpty) return v;
+    }
+    return null;
+  }
+}
 
 class CadastrarCliente extends StatefulWidget {
   final Function()? onClienteCadastrado;
@@ -88,19 +182,37 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
   bool _isLoading = false;
 
+  late final VoidCallback _cepListener;
+
+  late final ViaCepService _viaCep;
+  late final CorreiosCepService _correios;
+
   String _norm(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   @override
   void initState() {
     super.initState();
+    _viaCep = ViaCepService();
+    _correios = CorreiosCepService(
+      baseUrl: kCorreiosBaseUrl,
+      bearerToken: kCorreiosBearerToken,
+    );
+
     _dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     _horaVisitaCtrl.text = DateFormat('HH:mm').format(DateTime.now());
     _dataNegociacaoCtrl.clear();
     _horaNegociacaoCtrl.clear();
+
+    _cepListener = () {
+      final raw = _cepCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+      if (raw.length == 8) _buscarEnderecoComFallback(raw);
+    };
+    _cepCtrl.addListener(_cepListener);
   }
 
   @override
   void dispose() {
+    _cepCtrl.removeListener(_cepListener);
     _nomeClienteCtrl.dispose();
     _telefoneCtrl.dispose();
     _nomeEstabelecimentoCtrl.dispose();
@@ -187,7 +299,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
   String? _validarCEP(String? v) {
     final raw = (v ?? '').replaceAll(RegExp(r'[^\d]'), '');
-    if (raw.isEmpty) return 'CEP é obrigatório';
+    if (raw.isEmpty) return null;
     if (raw.length != 8) return 'CEP deve ter 8 dígitos';
     return null;
   }
@@ -215,6 +327,81 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
     );
+  }
+
+  void _onBuscarCepPressed() {
+    final cepRaw = _cepCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (cepRaw.length != 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe um CEP com 8 dígitos para buscar.')),
+      );
+      return;
+    }
+    _buscarEnderecoComFallback(cepRaw);
+  }
+
+  Future<void> _buscarEnderecoComFallback(String cep8) async {
+    try {
+      final status = await Connectivity().checkConnectivity();
+      if (status == ConnectivityResult.none) return;
+
+      EnderecoCep? end;
+      if (kCorreiosBearerToken.isNotEmpty) {
+        end = await _correios.buscar(cep8);
+      }
+      end ??= await _viaCep.buscar(cep8);
+
+      if (end == null) return;
+
+      String? tipo;
+      String nomeVia = end.logradouro ?? '';
+      if (nomeVia.isNotEmpty) {
+        final firstSpace = nomeVia.indexOf(' ');
+        if (firstSpace > 0) {
+          final possivelTipo = nomeVia.substring(0, firstSpace);
+          final resto = nomeVia.substring(firstSpace + 1);
+          if (_abbr.keys.contains(possivelTipo)) {
+            tipo = possivelTipo;
+            nomeVia = resto;
+          } else {
+            final token = possivelTipo[0].toUpperCase() + possivelTipo.substring(1).toLowerCase();
+            if (_abbr.keys.contains(token)) {
+              tipo = token;
+              nomeVia = resto;
+            }
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        final e = end;
+        if (e == null) return;
+
+        final uf = e.uf ?? '';
+        final cidade = e.cidade ?? '';
+        final bairro = e.bairro ?? '';
+        final logradouro = e.logradouro ?? '';
+        final complemento = e.complemento ?? '';
+
+        if (uf.isNotEmpty) _estadoCtrl.text = uf;
+        if (cidade.isNotEmpty) _cidadeCtrl.text = cidade;
+        if (bairro.isNotEmpty) _bairroCtrl.text = bairro;
+
+        if ((tipo ?? '').isNotEmpty) {
+          _tipoLogradouro = tipo;
+          _nomeViaCtrl.text = nomeVia;
+        } else if (logradouro.isNotEmpty) {
+          _tipoLogradouro = null;
+          _nomeViaCtrl.text = logradouro;
+        }
+
+        if (complemento.isNotEmpty && _complementoCtrl.text.trim().isEmpty) {
+          _complementoCtrl.text = complemento;
+        }
+      });
+    } catch (_) {
+    }
   }
 
   Future<void> _salvarCliente() async {
@@ -286,10 +473,14 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
       final dataNegociacaoAtual = DateFormat('dd/MM/yyyy').format(agora);
       final horaNegociacaoAtual = DateFormat('HH:mm').format(agora);
 
+      final telefoneDigits = _telefoneCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+      final cepDigits = _cepCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+      final nomeClienteNorm = _norm(_nomeClienteCtrl.text);
+
       final cliente = Cliente(
         id: const Uuid().v4(),
-        nomeCliente: _norm(_nomeClienteCtrl.text),
-        telefone: _telefoneCtrl.text.replaceAll(RegExp(r'[^\d]'), ''),
+        nomeCliente: nomeClienteNorm,
+        telefone: telefoneDigits,
         estabelecimento: _norm(_nomeEstabelecimentoCtrl.text),
         estado: _estadoCtrl.text.trim().toUpperCase(),
         cidade: _norm(_cidadeCtrl.text),
@@ -298,7 +489,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         numero: numeroInt,
         complemento: _complementoCtrl.text.trim().isNotEmpty ? _norm(_complementoCtrl.text) : null,
         bairro: _norm(_bairroCtrl.text),
-        cep: _cepCtrl.text.replaceAll(RegExp(r'[^\d]'), ''),
+        cep: cepDigits,
         dataVisita: dataHoraVisita,
         observacoes: _observacoesCtrl.text.trim().isNotEmpty ? _norm(_observacoesCtrl.text) : null,
         consultorResponsavel: consultorNomeLocal,
@@ -457,10 +648,14 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             TextFormField(
                               controller: _nomeClienteCtrl,
                               decoration: relaxIfNarrow(
-                                _obterDecoracaoCampo('Nome do Cliente', hint: 'Nome completo', prefixIcon: const Icon(Icons.person_outline)),
+                                _obterDecoracaoCampo(
+                                  'Nome do Cliente',
+                                  hint: 'Nome completo',
+                                  prefixIcon: const Icon(Icons.person_outline),
+                                  isObrigatorio: false,
+                                ),
                                 isNarrow,
                               ),
-                              validator: (v) => _validarCampoObrigatorio(v, field: 'Nome do cliente'),
                             ),
                             const SizedBox(height: 12),
 
@@ -469,10 +664,14 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                               keyboardType: TextInputType.phone,
                               inputFormatters: [_telefoneFormatter],
                               decoration: relaxIfNarrow(
-                                _obterDecoracaoCampo('Telefone', hint: '(00) 00000-0000', prefixIcon: const Icon(Icons.call_outlined)),
+                                _obterDecoracaoCampo(
+                                  'Telefone',
+                                  hint: '(00) 00000-0000',
+                                  prefixIcon: const Icon(Icons.call_outlined),
+                                  isObrigatorio: false,
+                                ),
                                 isNarrow,
                               ),
-                              validator: (v) => _validarCampoObrigatorio(v, field: 'Telefone'),
                             ),
                             const SizedBox(height: 12),
 
@@ -563,12 +762,38 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
                             ),
                             const SizedBox(height: 12),
 
-                            TextFormField(
-                              controller: _cepCtrl,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [_cepFormatter],
-                              decoration: _obterDecoracaoCampo('CEP', hint: '00000-000', prefixIcon: const Icon(Icons.local_post_office_outlined)),
-                              validator: _validarCEP,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _cepCtrl,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [_cepFormatter],
+                                    decoration: _obterDecoracaoCampo(
+                                      'CEP',
+                                      hint: '00000-000',
+                                      prefixIcon: const Icon(Icons.local_post_office_outlined),
+                                      isObrigatorio: false,
+                                    ),
+                                    validator: _validarCEP,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  height: 56,
+                                  child: FilledButton.icon(
+                                    onPressed: _onBuscarCepPressed,
+                                    icon: const Icon(Icons.cloud_download_outlined),
+                                    label: const Text('Buscar'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: kDanger,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
 
                             const SizedBox(height: 16),
@@ -666,7 +891,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
                             const SizedBox(height: 12),
 
-                            // Banner de aviso na paleta
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
