@@ -27,7 +27,10 @@ class _HomeConsultorState extends State<HomeConsultor> {
   int _totalAlertas = 0;
   int _totalFinalizados = 0;
   List<Cliente> _clientes = [];
+
   String _userName = 'Consultor';
+  String _matricula = '';               
+  DateTime _dataCadastro = DateTime.now(); 
 
   @override
   void initState() {
@@ -50,26 +53,43 @@ class _HomeConsultorState extends State<HomeConsultor> {
     try {
       Map<String, dynamic>? doc = await _client
           .from('consultores')
-          .select('id, uid, nome')
+          .select('id, uid, nome, matricula, data_cadastro')
           .eq('id', user.id)
           .maybeSingle();
 
-      if (doc == null) {
-        doc = await _client
-            .from('consultores')
-            .select('id, uid, nome')
-            .eq('uid', user.id)
-            .maybeSingle();
-      }
+      doc ??= await _client
+          .from('consultores')
+          .select('id, uid, nome, matricula, data_cadastro')
+          .eq('uid', user.id)
+          .maybeSingle();
 
       final nomeTabela = (doc?['nome'] as String?)?.trim() ?? '';
       final nomeAuth = (user.userMetadata?['name'] as String?)?.trim() ?? '';
       final nomeEscolhido =
           nomeTabela.isNotEmpty ? nomeTabela : (nomeAuth.isNotEmpty ? nomeAuth : 'Consultor');
 
-      if (mounted) setState(() => _userName = _formatarNome(nomeEscolhido));
+      final matricula = (doc?['matricula'] as String?)?.trim() ?? '';
+      final dataCadastroIso = doc?['data_cadastro']?.toString();
+
+      DateTime? parsed;
+      if (dataCadastroIso != null && dataCadastroIso.isNotEmpty) {
+        parsed = DateTime.tryParse(dataCadastroIso);
+      }
+
+      if (mounted) {
+        setState(() {
+          _userName = _formatarNome(nomeEscolhido);
+          _matricula = matricula;
+          _dataCadastro = parsed ?? _dataCadastro;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _userName = 'Consultor');
+      if (mounted) {
+        setState(() {
+          _userName = 'Consultor';
+          _matricula = '';
+        });
+      }
     }
   }
 
@@ -489,10 +509,13 @@ class _HomeConsultorState extends State<HomeConsultor> {
               ),
             ),
             child: CustomNavbar(
-              nome: _userName,
-              cargo: 'Consultor',
+              nomeCompleto: _userName,
+              email: _client.auth.currentUser?.email ?? '',
+              idUsuario: _client.auth.currentUser?.id ?? '',
+              matricula: _matricula,              
+              dataCadastro: _dataCadastro,        
               tabsNoAppBar: false,
-              hideAvatar: true,
+              hideAvatar: false,
             ),
           ),
         ),

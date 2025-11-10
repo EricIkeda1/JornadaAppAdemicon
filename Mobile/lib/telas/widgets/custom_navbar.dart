@@ -1,9 +1,12 @@
-// lib/telas/widgets/custom_navbar.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
-  final String nome;
-  final String cargo;
+class CustomNavbar extends StatefulWidget implements PreferredSizeWidget {
+  final String nomeCompleto;
+  final String email;
+  final String idUsuario;
+  final String matricula;
+  final DateTime dataCadastro;
   final TabController? tabController;
   final List<Tab>? tabs;
   final bool tabsNoAppBar;
@@ -13,8 +16,11 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
 
   const CustomNavbar({
     super.key,
-    required this.nome,
-    required this.cargo,
+    required this.nomeCompleto,
+    required this.email,
+    required this.idUsuario,
+    required this.matricula,
+    required this.dataCadastro,
     this.tabController,
     this.tabs,
     this.tabsNoAppBar = true,
@@ -24,11 +30,103 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
+  Size get preferredSize =>
+      Size.fromHeight(68 + (tabsNoAppBar && tabs != null ? 60 : 0));
+
+  @override
+  State<CustomNavbar> createState() => _CustomNavbarState();
+}
+
+class _CustomNavbarState extends State<CustomNavbar> {
+  static const branco = Color(0xFFFFFFFF);
+  static const preto09 = Color(0xFF231F20);
+  static const vermelho = Color(0xFFEA3124);
+  static const vermelhoB = Color(0xFFCC1F17);
+  static const corBorda = Color(0xFF3A2E2E);
+  static const corTexto = Color(0xFF2F2B2B);
+
+  bool _expandido = false;
+
+  String _nomeCurto(String completo) {
+    final parts = completo.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return completo.trim();
+    if (parts.length == 1) return parts.first;
+    final blacklist = {'filho', 'neto', 'junior', 'jr.', 'jr', 'sobrinho'};
+    var last = parts.last;
+    if (blacklist.contains(last.toLowerCase()) && parts.length >= 3) {
+      last = parts[parts.length - 2];
+    }
+    return '${parts.first} $last';
+  }
+
+  String _iniciais(String nome) {
+    final p = nome.trim().split(RegExp(r'\s+'));
+    if (p.isEmpty) return 'US';
+    if (p.length == 1) return p.first.substring(0, 1).toUpperCase();
+    return (p.first.substring(0, 1) + p.last.substring(0, 1)).toUpperCase();
+  }
+
+  String _fmtData(DateTime d) => DateFormat('dd/MM/yyyy HH:mm').format(d);
+
+  Future<void> _abrirMenuPerfilEsquerda(TapDownDetails details, double popupWidth) async {
+    setState(() => _expandido = true);
+
+    final overlayBox = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final barBox = context.findRenderObject() as RenderBox;
+    final barTopLeft = barBox.localToGlobal(Offset.zero);
+
+    final double leftX = barTopLeft.dx + 16;
+    final double topY = barTopLeft.dy + kToolbarHeight;
+
+    final position = RelativeRect.fromLTRB(
+      leftX,
+      topY,
+      overlayBox.size.width - leftX - popupWidth,
+      overlayBox.size.height - topY - 1,
+    );
+
+    await showMenu<int>(
+      context: context,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: corBorda, width: 1),
+      ),
+      position: position,
+      items: [
+        PopupMenuItem<int>(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: popupWidth),
+            child: _buildPerfilCard(
+              iniciais: _iniciais(widget.nomeCompleto),
+              nomeCompleto: widget.nomeCompleto,
+              cargo: 'Consultor',
+              idUsuario: widget.idUsuario,
+              email: widget.email,
+              matricula: widget.matricula,
+              dataCadastroFmt: _fmtData(widget.dataCadastro),
+              onSair: () {
+                Navigator.pop(context);
+                (widget.onLogout ??
+                    () => Navigator.pushReplacementNamed(context, '/login'))();
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (mounted) setState(() => _expandido = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     const double baseToolbar = 68.0;
     const double minToolbar = 56.0;
 
-    final double t = collapseProgress.clamp(0.0, 1.0);
+    final double t = widget.collapseProgress.clamp(0.0, 1.0);
     final double toolbarHeight = lerpDouble(baseToolbar, minToolbar, t);
     final double logoHeight = lerpDouble(32, 24, t);
 
@@ -37,9 +135,11 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
     final double nomeSize = 16.0 * scale;
     final double cargoSize = 12.0 * scale;
 
+    final nomeCurto = _nomeCurto(widget.nomeCompleto);
+
     return PreferredSize(
-      preferredSize: Size.fromHeight(
-          toolbarHeight + (tabsNoAppBar && tabs != null ? 60 : 0)),
+      preferredSize:
+          Size.fromHeight(toolbarHeight + (widget.tabsNoAppBar && widget.tabs != null ? 60 : 0)),
       child: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
@@ -61,70 +161,97 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
               alignment: Alignment.centerLeft,
               child: Padding(
                 padding: const EdgeInsets.only(left: 16),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!hideAvatar)
-                      const CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Color(0xFF231F20),
-                        child: Icon(Icons.person, size: 16, color: Colors.white),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (d) => _abrirMenuPerfilEsquerda(d, 340),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!widget.hideAvatar)
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFE4E1), Color(0xFFFFF5F5)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(color: corBorda, width: 1),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x14000000), blurRadius: 3, offset: Offset(0, 1)),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  _iniciais(widget.nomeCompleto),
+                                  style: const TextStyle(color: vermelho, fontSize: 11, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 8, height: 8,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2ECC71),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (!widget.hideAvatar) const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                nomeCurto,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black87,
+                                  fontSize: nomeSize,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              AnimatedRotation(
+                                turns: _expandido ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 180),
+                                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: corTexto),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'Consultor',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: cargoSize,
+                              color: vermelho,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    if (!hideAvatar) const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          nome,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                            fontSize: nomeSize,
-                          ),
-                        ),
-                        Text(
-                          cargo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: cargoSize,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.logout, size: 14),
-                  label: const Text('Sair'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF231F20),
-                    side: const BorderSide(color: Color(0xFF231F20)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    textStyle:
-                        const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
+                    ],
                   ),
-                  onPressed:
-                      onLogout ?? () => Navigator.pushReplacementNamed(context, '/login'),
                 ),
               ),
             ),
           ],
         ),
-        bottom: tabsNoAppBar && tabs != null && tabController != null
+        bottom: widget.tabsNoAppBar && widget.tabs != null && widget.tabController != null
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(60),
                 child: Container(
@@ -136,16 +263,13 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: TabBar(
-                      controller: tabController,
+                      controller: widget.tabController,
                       isScrollable: true,
-                      labelPadding:
-                          const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       labelColor: Colors.black,
                       unselectedLabelColor: Colors.white,
-                      labelStyle:
-                          const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                      unselectedLabelStyle:
-                          const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       indicator: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(22),
@@ -162,7 +286,7 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
                       indicatorSize: TabBarIndicatorSize.tab,
                       splashBorderRadius: BorderRadius.circular(22),
                       automaticIndicatorColorAdjustment: false,
-                      tabs: tabs!,
+                      tabs: widget.tabs!,
                     ),
                   ),
                 ),
@@ -172,9 +296,189 @@ class CustomNavbar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  @override
-  Size get preferredSize =>
-      Size.fromHeight(68 + (tabsNoAppBar && tabs != null ? 60 : 0));
+  Widget _buildPerfilCard({
+    required String iniciais,
+    required String nomeCompleto,
+    required String cargo,
+    required String idUsuario,
+    required String email,
+    required String matricula,
+    required String dataCadastroFmt,
+    required VoidCallback onSair,
+  }) {
+    const cinzaItem = Color(0xFFF7F7F7);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 340,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 6))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [vermelho, vermelhoB], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0x22FFFFFF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(cargo, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(color: Colors.white, width: 5),
+                          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 3, offset: Offset(0, 1))],
+                        ),
+                        child: Center(
+                          child: Text(iniciais, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFFB71C1C))),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                nomeCompleto,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(cargo, style: const TextStyle(color: Color(0xFFEDEDED), fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+
+            Container(height: 14, color: const Color(0xFFF6F6F6)),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                children: [
+                  _perfilRow(bg: cinzaItem, icon: Icons.tag, titulo: 'ID do Usuário', valor: idUsuario, enfase: true),
+                  _perfilRow(bg: cinzaItem, icon: Icons.alternate_email, titulo: 'Email Corporativo', valor: email, enfase: true),
+                  _perfilRow(bg: cinzaItem, icon: Icons.badge_outlined, titulo: 'Cargo', valor: cargo, enfase: true),
+                  _perfilRow(bg: cinzaItem, icon: Icons.event, titulo: 'Data de Cadastro', valor: dataCadastroFmt, enfase: true),
+                  _perfilRow(bg: cinzaItem, icon: Icons.badge, titulo: 'Matrícula', valor: matricula, enfase: true),
+                ],
+              ),
+            ),
+
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0x143A2E2E))),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: vermelho,
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: onSair,
+                  icon: const Icon(Icons.logout_outlined),
+                  label: const Text('Sair da Conta', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _perfilRow({
+    required Color bg,
+    required IconData icon,
+    required String titulo,
+    required String valor,
+    bool enfase = false,
+  }) {
+    final Color borda = enfase ? const Color(0x33EA3124) : const Color(0x143A2E2E);
+    final Color bgIcon = enfase ? const Color(0x1AEA3124) : bg;
+    final Color corIcone = enfase ? vermelho : const Color(0xFF2F2B2B);
+    final FontWeight pesoValor = enfase ? FontWeight.w800 : FontWeight.w700;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: enfase ? const Color(0x1AEA3124) : const Color(0x0F000000),
+            blurRadius: enfase ? 6 : 3,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: borda, width: enfase ? 1.5 : 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: bgIcon, borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: corIcone, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo, style: const TextStyle(fontSize: 11, color: Color(0xFF7A7A7A), fontWeight: FontWeight.w600)),
+                const SizedBox(height: 3),
+                Text(
+                  valor,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 15, color: const Color(0xFF231F20), fontWeight: pesoValor),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 double lerpDouble(double a, double b, double t) => a + (b - a) * t;
