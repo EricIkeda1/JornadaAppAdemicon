@@ -454,7 +454,6 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
 
       final numeroStr = _numeroCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
       final int? numeroInt = numeroStr.isEmpty ? null : int.tryParse(numeroStr);
-      // REMOVIDO o bloqueio do número obrigatório — número pode ser null
 
       num? valorProposta;
       final rawValor = _valorPropostaCtrl.text.trim();
@@ -480,7 +479,7 @@ class _CadastrarClienteState extends State<CadastrarCliente> {
         cidade: _norm(_cidadeCtrl.text),
         endereco: enderecoNome,
         logradouro: logradouroTipo,
-        numero: numeroInt, // aceita null
+        numero: numeroInt, 
         complemento: _complementoCtrl.text.trim().isNotEmpty ? _norm(_complementoCtrl.text) : null,
         bairro: _norm(_bairroCtrl.text),
         cep: cepDigits,
@@ -1005,12 +1004,11 @@ class _CampoNumero extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.number,
       decoration: InputDecoration(
-        labelText: 'Número', // removido asterisco
+        labelText: 'Número', 
         hintText: '123',
         prefixIcon: const Icon(Icons.pin_outlined),
         contentPadding: isNarrow ? const EdgeInsets.symmetric(horizontal: 16, vertical: 18) : null,
       ),
-      // validator removido para tornar opcional
     );
   }
 }

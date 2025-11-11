@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/widgets.dart' show Directionality;
 import '../widgets/custom_navbar.dart';
 import 'meus_clientes_tab.dart';
 import 'minhas_visitas_tab.dart';
@@ -10,6 +11,72 @@ import 'exportar_dados_tab.dart';
 import 'cadastrar_cliente.dart';
 import '../../models/cliente.dart';
 import '../../services/cliente_service.dart';
+
+class AdaptiveValueText extends StatelessWidget {
+  final String valueText;      
+  final String? compactFallback;  
+  final double fontSize;
+  final FontWeight fontWeight;
+  final TextAlign textAlign;
+  final bool preferCompactAboveThousand; 
+
+  const AdaptiveValueText({
+    super.key,
+    required this.valueText,
+    this.compactFallback,
+    this.fontSize = 20,
+    this.fontWeight = FontWeight.w700,
+    this.textAlign = TextAlign.right,
+    this.preferCompactAboveThousand = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, cst) {
+      final textStyle = TextStyle(fontSize: fontSize, fontWeight: fontWeight);
+
+      if (preferCompactAboveThousand && compactFallback != null) {
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            compactFallback!,
+            textAlign: textAlign,
+            style: textStyle,
+          ),
+        );
+      }
+
+      final tp = TextPainter(
+        text: TextSpan(text: valueText, style: textStyle),
+        maxLines: 1,
+        textDirection: Directionality.of(context),
+      )..layout(maxWidth: cst.maxWidth);
+
+      if (tp.didExceedMaxLines && compactFallback != null) {
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            compactFallback!,
+            textAlign: textAlign,
+            style: textStyle,
+          ),
+        );
+      }
+
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: Text(
+          valueText,
+          textAlign: textAlign,
+          style: textStyle,
+        ),
+      );
+    });
+  }
+}
 
 class HomeConsultor extends StatefulWidget {
   const HomeConsultor({super.key});
@@ -24,13 +91,15 @@ class _HomeConsultorState extends State<HomeConsultor> {
 
   int _totalClientes = 0;
   int _totalVisitasHoje = 0;
-  int _totalAlertas = 0;
   int _totalFinalizados = 0;
   List<Cliente> _clientes = [];
 
+  double _valorMes = 0.0;
+  final NumberFormat _brl = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
   String _userName = 'Consultor';
-  String _matricula = '';               
-  DateTime _dataCadastro = DateTime.now(); 
+  String _matricula = '';
+  DateTime _dataCadastro = DateTime.now();
 
   @override
   void initState() {
@@ -98,38 +167,57 @@ class _HomeConsultorState extends State<HomeConsultor> {
     if (user == null || !mounted) return;
     final uid = user.id;
 
-    final rows = await _client.from('clientes').select('*').eq('consultor_uid_t', uid);
-    final clientes =
-        (rows as List).map((m) => Cliente.fromMap(m as Map<String, dynamic>)).toList();
+    final rows = await _client.from('clientes').select('*').eq('consultor_uid_t', uid) as List;
+
+    final clientes = rows.map((m) => Cliente.fromMap(m as Map<String, dynamic>)).toList();
 
     final agora = DateTime.now();
     final hoje = DateTime(agora.year, agora.month, agora.day);
 
-    final visitasHoje = clientes
-        .where((c) {
-          final d = c.dataVisita;
-          return d.year == hoje.year && d.month == hoje.month && d.day == hoje.day;
-        })
-        .length;
+    final visitasHoje = clientes.where((c) {
+      final d = c.dataVisita;
+      return d.year == hoje.year && d.month == hoje.month && d.day == hoje.day;
+    }).length;
 
-    final alertas = clientes
-        .where((c) {
-          final d = DateTime(c.dataVisita.year, c.dataVisita.month, c.dataVisita.day);
-          return d.isBefore(hoje);
-        })
-        .length;
+    final inicioMes = DateTime(agora.year, agora.month, 1);
+    final proximoMes = DateTime(agora.year, agora.month + 1, 1);
+    double somaMes = 0.0;
 
-    final finalizados = alertas;
+    for (final row in rows) {
+      final map = row as Map<String, dynamic>;
+      final dataStr = map['data_visita']?.toString();
+      if (dataStr == null || dataStr.isEmpty) continue;
 
-    if (mounted) {
-      setState(() {
-        _clientes = clientes;
-        _totalClientes = clientes.length;
-        _totalVisitasHoje = visitasHoje;
-        _totalAlertas = alertas;
-        _totalFinalizados = finalizados;
-      });
+      DateTime? d;
+      try {
+        d = DateTime.parse(dataStr);
+      } catch (_) {
+        continue;
+      }
+
+      final dentroDoMes = !d.isBefore(inicioMes) && d.isBefore(proximoMes);
+      if (!dentroDoMes) continue;
+
+      final raw = map['valor_proposta'];
+      double v = 0.0;
+      if (raw is num) v = raw.toDouble();
+      else if (raw != null) v = double.tryParse(raw.toString()) ?? 0.0;
+      somaMes += v;
     }
+
+    final finalizados = rows.where((row) {
+      final status = (row as Map<String, dynamic>)['status_negociacao'] as String?;
+      return status != null && status.toLowerCase() == 'fechada';
+    }).length;
+
+    if (!mounted) return;
+    setState(() {
+      _clientes = clientes;
+      _totalClientes = clientes.length;
+      _totalVisitasHoje = visitasHoje;
+      _valorMes = somaMes;
+      _totalFinalizados = finalizados;
+    });
   }
 
   void _onClienteCadastrado() => _loadStats();
@@ -271,7 +359,7 @@ class _HomeConsultorState extends State<HomeConsultor> {
   }
 
   DateTime _composeToday(DateTime data, String? hora) {
-    if (hora == null || hora.isEmpty) {
+    if (hora is! String || hora.isEmpty) {
       return DateTime(data.year, data.month, data.day);
     }
     final parts = hora.split(':');
@@ -492,6 +580,25 @@ class _HomeConsultorState extends State<HomeConsultor> {
     );
   }
 
+  String abreviarBRL(num v) {
+    final abs = v.abs();
+    String s;
+    if (abs >= 1e12) {
+      s = 'R\$ ${(v / 1e12).toStringAsFixed(2)} tri';
+    } else if (abs >= 1e9) {
+      s = 'R\$ ${(v / 1e9).toStringAsFixed(2)} bi';
+    } else if (abs >= 1e6) {
+      s = 'R\$ ${(v / 1e6).toStringAsFixed(2)} mi';
+    } else if (abs >= 1e3) {
+      s = 'R\$ ${(v / 1e3).toStringAsFixed(2)} mil';
+    } else {
+      s = _brl.format(v);
+    }
+    return s.replaceAll('.', '#').replaceAll(',', '.').replaceAll('#', ',');
+  }
+
+  String formatBRLSeguro(num v) => _brl.format(v);
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -512,8 +619,8 @@ class _HomeConsultorState extends State<HomeConsultor> {
               nomeCompleto: _userName,
               email: _client.auth.currentUser?.email ?? '',
               idUsuario: _client.auth.currentUser?.id ?? '',
-              matricula: _matricula,              
-              dataCadastro: _dataCadastro,        
+              matricula: _matricula,
+              dataCadastro: _dataCadastro,
               tabsNoAppBar: false,
               hideAvatar: false,
             ),
@@ -560,13 +667,14 @@ class _HomeConsultorState extends State<HomeConsultor> {
                       SizedBox(
                         width: itemWidth,
                         child: _metricCard(
-                          title: 'Alertas',
-                          value: _totalAlertas.toString(),
-                          icon: Icons.notifications_active,
+                          title: 'Valor no mês',
+                          value: _valorMes, 
+                          icon: Icons.account_balance_wallet_rounded,
                           color: Colors.orange,
-                          subtitle: 'Visitas vencidas',
+                          subtitle: 'Propostas',
                           dense: true,
                           alignRightValue: true,
+                          isCurrency: true,
                         ),
                       ),
                       SizedBox(
@@ -630,22 +738,33 @@ class _HomeConsultorState extends State<HomeConsultor> {
 
   Widget _metricCard({
     required String title,
-    required String value,
+    required dynamic value,
     required IconData icon,
     required Color color,
     String? subtitle,
     bool dense = false,
     bool alignRightValue = true,
+    bool isCurrency = false,
   }) {
     final double h = dense ? 56 : 72;
-    final EdgeInsets pad = dense
-        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
-        : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+    final EdgeInsets pad =
+        dense ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8) : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
     final double iconSize = dense ? 16 : 18;
     final double avatarRadius = dense ? 13 : 16;
     final double titleSize = dense ? 11 : 12.5;
     final double valueSize = dense ? 18 : 20;
     final double subtitleSize = dense ? 10 : 11;
+
+    String fullText;
+    String? fallbackText;
+
+    if (isCurrency && value is num) {
+      fullText = formatBRLSeguro(value);
+      fallbackText = abreviarBRL(value); 
+    } else {
+      fullText = value.toString();
+      fallbackText = null;
+    }
 
     return Card(
       elevation: 1,
@@ -693,13 +812,13 @@ class _HomeConsultorState extends State<HomeConsultor> {
                 alignment: Alignment.centerRight,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minWidth: 24),
-                  child: Text(
-                    value,
+                  child: AdaptiveValueText(
+                    valueText: fullText,
+                    compactFallback: fallbackText,
+                    fontSize: valueSize,
+                    fontWeight: FontWeight.w700,
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: valueSize,
-                    ),
+                    preferCompactAboveThousand: isCurrency, 
                   ),
                 ),
               ),

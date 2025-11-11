@@ -45,16 +45,15 @@ class _CustomNavbarState extends State<CustomNavbar> {
   static const corBorda = Color(0xFF3A2E2E);
   static const corTexto = Color(0xFF2F2B2B);
 
-  // Mesmo esquema: AppBar mostra só o primeiro nome se houver mais de uma palavra
   String _nomeCurto(String completo) {
     final parts = completo.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return completo.trim();
-    if (parts.length > 1) return parts.first; // "Augusto tal tal tal" -> "Augusto"
+    if (parts.length > 1) return parts.first;
     return parts.first;
   }
 
   String _iniciais(String nome) {
-    final p = nome.trim().split(RegExp(r'\s+'));
+    final p = nome.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
     if (p.isEmpty) return 'US';
     if (p.length == 1) return p.first.substring(0, 1).toUpperCase();
     return (p.first.substring(0, 1) + p.last.substring(0, 1)).toUpperCase();
@@ -64,20 +63,16 @@ class _CustomNavbarState extends State<CustomNavbar> {
 
   Future<void> _abrirMenuPerfilEsquerda(
       TapDownDetails details, double popupWidth) async {
-    final overlay = Overlay.of(context);
-    if (overlay == null) return;
-
     final screen = MediaQuery.of(context).size;
+    final paddingTop = MediaQuery.of(context).padding.top;
+    const gutterTop = 6.0;    
+    const leftPadding = 8.0;   
+
     final cardWidth =
         screen.width < popupWidth + 24 ? screen.width * 0.92 : popupWidth;
 
-    final appBarTopLeft =
-        (context.findRenderObject() as RenderBox?)?.localToGlobal(Offset.zero) ??
-            Offset.zero;
-
-    const leftPadding = 8.0; // 0.2 cm ≈ 8 px
     final double leftX = leftPadding;
-    final double topY = appBarTopLeft.dy + kToolbarHeight;
+    final double topY = paddingTop + kToolbarHeight + gutterTop;
 
     final position = RelativeRect.fromLTRB(
       leftX,
@@ -98,29 +93,32 @@ class _CustomNavbarState extends State<CustomNavbar> {
         PopupMenuItem<int>(
           enabled: false,
           padding: EdgeInsets.zero,
-          child: SafeArea(
-            minimum: const EdgeInsets.only(bottom: 8),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: cardWidth,
-                maxHeight: screen.height * 0.8,
-              ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: _buildPerfilCard(
-                  iniciais: _iniciais(widget.nomeCompleto),
-                  nomeCompleto: widget.nomeCompleto, // Card: nome completo
-                  cargo: 'Consultor',
-                  idUsuario: widget.idUsuario,
-                  email: widget.email,
-                  matricula: widget.matricula,
-                  dataCadastroFmt: _fmtData(widget.dataCadastro),
-                  onSair: () {
-                    Navigator.pop(context);
-                    (widget.onLogout ??
-                        () => Navigator.pushReplacementNamed(
-                            context, '/login'))();
-                  },
+          child: Material(
+            type: MaterialType.transparency, 
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: cardWidth,
+                  maxHeight: screen.height * 0.8,
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: _buildPerfilCard(
+                    iniciais: _iniciais(widget.nomeCompleto),
+                    nomeCompleto: widget.nomeCompleto,
+                    cargo: 'Consultor',
+                    idUsuario: widget.idUsuario,
+                    email: widget.email,
+                    matricula: widget.matricula,
+                    dataCadastroFmt: _fmtData(widget.dataCadastro),
+                    onSair: () {
+                      Navigator.pop(context);
+                      (widget.onLogout ??
+                          () => Navigator.pushReplacementNamed(
+                              context, '/login'))();
+                    },
+                  ),
                 ),
               ),
             ),
@@ -144,7 +142,7 @@ class _CustomNavbarState extends State<CustomNavbar> {
     final double nomeSize = 16.0 * scale;
     final double cargoSize = 12.0 * scale;
 
-    final nomeCurto = _nomeCurto(widget.nomeCompleto); // AppBar: curto
+    final nomeCurto = _nomeCurto(widget.nomeCompleto);
 
     return PreferredSize(
       preferredSize:
@@ -169,7 +167,7 @@ class _CustomNavbarState extends State<CustomNavbar> {
             Align(
               alignment: Alignment.centerLeft,
               child: Padding(
-                padding: const EdgeInsets.only(left: 8), // 0.2 cm para a direita
+                padding: const EdgeInsets.only(left: 8),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (d) => _abrirMenuPerfilEsquerda(d, 340),
@@ -223,7 +221,7 @@ class _CustomNavbarState extends State<CustomNavbar> {
                             ],
                           ),
                         ),
-                      if (!widget.hideAvatar) const SizedBox(width: 4), // gap avatar->texto
+                      if (!widget.hideAvatar) const SizedBox(width: 4),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -231,7 +229,6 @@ class _CustomNavbarState extends State<CustomNavbar> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // AppBar: somente primeiro nome se for composto
                               Text(
                                 nomeCurto,
                                 maxLines: 1,
@@ -333,24 +330,16 @@ class _CustomNavbarState extends State<CustomNavbar> {
           children: [
             Container(
               decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [vermelho, vermelhoB], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: LinearGradient(
+                  colors: [vermelho, vermelhoB],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0x22FFFFFF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(cargo, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const SizedBox(width: 12),
@@ -374,7 +363,6 @@ class _CustomNavbarState extends State<CustomNavbar> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Card: nome completo
                               Text(
                                 nomeCompleto,
                                 maxLines: 1,
@@ -403,7 +391,7 @@ class _CustomNavbarState extends State<CustomNavbar> {
                   _perfilRow(bg: cinzaItem, icon: Icons.tag, titulo: 'ID do Usuário', valor: idUsuario, enfase: true),
                   _perfilRow(bg: cinzaItem, icon: Icons.alternate_email, titulo: 'Email Corporativo', valor: email, enfase: true),
                   _perfilRow(bg: cinzaItem, icon: Icons.badge_outlined, titulo: 'Cargo', valor: cargo, enfase: true),
-                  _perfilRow(bg: cinzaItem, icon: Icons.event, titulo: 'Data de Cadastro', valor: dataCadastroFmt, enfase: true),
+                  _perfilRow(bg: cinzaItem, icon: Icons.event, titulo: 'Registrado em', valor: dataCadastroFmt, enfase: true),
                   _perfilRow(bg: cinzaItem, icon: Icons.badge, titulo: 'Matrícula', valor: matricula, enfase: true),
                 ],
               ),
