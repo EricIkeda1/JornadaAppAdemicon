@@ -44,7 +44,7 @@ class BrPhoneTextInputFormatter extends TextInputFormatter {
 
 class ConsultoresRoot extends StatefulWidget {
   final VoidCallback? onCadastrar;
-  final PageController? pageController; 
+  final PageController? pageController;
 
   const ConsultoresRoot({super.key, this.onCadastrar, this.pageController});
 
@@ -88,8 +88,12 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
   }
 
   Future<void> _fetchTotalCount() async {
-    final total = await _client.from('consultores').count(CountOption.exact);
-    setState(() => _totalCount = total);
+    final res = await _client
+        .from('consultores')
+        .select('id')
+        .eq('ativo', true)
+        .count(CountOption.exact); 
+    setState(() => _totalCount = res.count ?? 0);
   }
 
   Future<void> _fetchPage() async {
@@ -99,8 +103,9 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
     final dynamic result = await _client
         .from('consultores')
         .select('id, uid, nome, email, telefone, matricula')
+        .eq('ativo', true)
         .order('nome', ascending: true)
-        .range(start, end);
+        .range(start, end); 
 
     final List<dynamic> raw = result as List<dynamic>;
     final rows = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -169,18 +174,23 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
     );
     if (confirmed != true) return;
     try {
-      await _client.from('consultores').delete().eq('id', c.id);
+      await _client
+          .from('consultores')
+          .update({'ativo': false})
+          .eq('id', c.id);
+
       setState(() {
         _consultores.removeWhere((x) => x.id == c.id);
         _totalCount = (_totalCount - 1).clamp(0, 1 << 31);
         _visibleCount = _consultores.length;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Consultor excluído com sucesso'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Conta marcada como inativa'), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao excluir: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Falha ao atualizar: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -195,8 +205,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
     final pc = widget.pageController;
     if (pc != null) {
       await pc.animateToPage(1, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
-    } else {
-    }
+    } else {}
   }
 
   @override
@@ -555,7 +564,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
             'email': _emailCtrl.text.trim(),
             'matricula': _matCtrl.text.trim().isEmpty ? null : _matCtrl.text.trim(),
           })
-          .eq('id', widget.consultor.id);
+          .eq('id', widget.consultor.id); 
       if (!mounted) return;
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -692,7 +701,8 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                                     gradient: const LinearGradient(
                                       colors: [_brandRed, _brandRedDark],
                                       begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight),
+                                      end: Alignment.centerRight,
+                                    ),
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
                                   ),
@@ -813,6 +823,21 @@ class _ConfirmExcluirDialog extends StatelessWidget {
                   titleColor: const Color(0xFFB78900),
                 ),
                 const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    icon: const Icon(Icons.delete_forever, color: _brandRed),
+                    label: const Text('Excluir conta', style: TextStyle(color: _brandRed, fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(color: Color(0xFFE3E3E6)),
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   height: 46,

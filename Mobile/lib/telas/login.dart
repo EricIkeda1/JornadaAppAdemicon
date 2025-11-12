@@ -67,11 +67,9 @@ class _LoginPageState extends State<LoginPage> {
             .eq('id', user.id)
             .maybeSingle();
         if (gestor != null) {
-          print('✅ Gestor encontrado: ${gestor['tipo']}');
         }
       } catch (e) {
         gestor = null;
-        print('❌ Erro ao buscar gestor: $e');
       }
 
       if (gestor == null) {
@@ -82,11 +80,9 @@ class _LoginPageState extends State<LoginPage> {
               .eq('uid', user.id)
               .maybeSingle();
           if (consultor != null) {
-            print('✅ Consultor encontrado: ${consultor['tipo']}');
           }
         } catch (e) {
           consultor = null;
-          print('❌ Erro ao buscar consultor: $e');
         }
       }
 
@@ -149,6 +145,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned(
@@ -159,7 +156,9 @@ class _LoginPageState extends State<LoginPage> {
           ),
           Center(
             child: SingleChildScrollView(
+              reverse: true, 
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Form(
                 key: _formKey,
                 child: ConstrainedBox(
