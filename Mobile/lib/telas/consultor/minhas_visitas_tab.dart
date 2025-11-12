@@ -144,6 +144,82 @@ class MinhasVisitasTabState extends State<MinhasVisitasTab>
     cacheFinalizados = null;
   }
 
+  String normStatusNeg(dynamic raw) {
+    final s0 = (raw?.toString() ?? '').trim().toLowerCase();
+    return s0
+        .replaceAll('á', 'a')
+        .replaceAll('à', 'a')
+        .replaceAll('ã', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('ç', 'c')
+        .replaceAll('é', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ô', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  bool isConexao(dynamic raw) {
+    final s = normStatusNeg(raw);
+    return s == 'conexao' || s.contains('novo') || s.contains('inicial');
+  }
+
+  bool isNegociacao(dynamic raw) {
+    final s = normStatusNeg(raw);
+    return s == 'negociacao' ||
+        s.contains('em negociacao') ||
+        s.contains('proposta enviada') ||
+        s.contains('propostaenviada') ||
+        s.contains('em andamento');
+  }
+
+  bool isFechado(dynamic raw) {
+    final s = normStatusNeg(raw);
+    return s == 'fechado' || s == 'fechada' || s.contains('venda');
+  }
+
+  DateTime? visitaDateTime(Map<String, dynamic> c) {
+    final ds = c['data_visita']?.toString() ?? c['datavisita']?.toString() ?? '';
+    if (ds.isEmpty) return null;
+    try {
+      DateTime d = DateTime.parse(ds).toLocal();
+      final hs = c['hora_visita']?.toString() ?? c['horavisita']?.toString() ?? '';
+      if (hs.isNotEmpty) {
+        final p = hs.split(':');
+        final h = p.isNotEmpty ? int.tryParse(p[0]) ?? 0 : 0;
+        final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+        final s = p.length > 2 ? int.tryParse(p[2]) ?? 0 : 0;
+        d = DateTime(d.year, d.month, d.day, h, m, s);
+      } else {
+        d = DateTime(d.year, d.month, d.day, 23, 59, 59);
+      }
+      return d;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool isPassado(Map<String, dynamic> c) {
+    final d = visitaDateTime(c);
+    if (d == null) return false;
+    final agora = DateTime.now();
+    final hojeIni = DateTime(agora.year, agora.month, agora.day, 0, 0, 0);
+    return d.isBefore(hojeIni);
+  }
+
+  bool matchProximas(Map<String, dynamic> c) {
+    final s = c['status_negociacao'] ?? c['statusnegociacao'];
+    return (isConexao(s) || isNegociacao(s)) && !isPassado(c);
+  }
+
+  bool matchFinalizadas(Map<String, dynamic> c) {
+    final s = c['status_negociacao'] ?? c['statusnegociacao'];
+    return isFechado(s);
+  }
+
   int _rankNeg(String? raw) {
     final s = (raw ?? '').trim().toLowerCase();
     if (s == 'conexao' || s == 'novo' || s == 'inicial') return 0;
@@ -238,8 +314,7 @@ class MinhasVisitasTabState extends State<MinhasVisitasTab>
     }
   }
 
-  Map<String, dynamic> determinarStatus(String? dataVisitaStr,
-      {String? horaVisitaStr}) {
+  Map<String, dynamic> determinarStatus(String? dataVisitaStr, {String? horaVisitaStr}) {
     if (dataVisitaStr == null || dataVisitaStr.isEmpty) {
       return {
         'icone': Icons.schedule_outlined,
@@ -368,9 +443,8 @@ class MinhasVisitasTabState extends State<MinhasVisitasTab>
     if (!showChips) return const SizedBox.shrink();
 
     final termos = ruasTodas.toList()..sort();
-    final visiveis = termos
-        .where((t) => query.isEmpty || t.toLowerCase().contains(query.toLowerCase()))
-        .toList();
+    final visiveis =
+        termos.where((t) => query.isEmpty || t.toLowerCase().contains(query.toLowerCase())).toList();
 
     if (visiveis.isEmpty) return const SizedBox.shrink();
 
@@ -823,32 +897,15 @@ class MinhasVisitasTabState extends State<MinhasVisitasTab>
         }
 
         bool isAgendado(Map<String, dynamic> c) {
-          final ds = c['data_visita']?.toString();
-          DateTime? data;
-          if (ds != null && ds.isNotEmpty) {
-            try {
-              data = DateTime.parse(ds).toLocal();
-            } catch (_) {}
-          }
-          final hs = c['hora_visita']?.toString();
-          if (data != null) {
-            if (hs != null && hs.isNotEmpty) {
-              final p = hs.split(':');
-              int part(int i) => i < p.length ? int.tryParse(p[i]) ?? 0 : 0;
-              data = DateTime(data.year, data.month, data.day, part(0), part(1), part(2));
-            } else {
-              data = DateTime(data.year, data.month, data.day, 23, 59, 59);
-            }
-          } else {
-            return false;
-          }
+          final d = visitaDateTime(c);
+          if (d == null) return false;
           final agora = DateTime.now();
           final hojeInicio = DateTime(agora.year, agora.month, agora.day, 0, 0, 0);
           final hojeFim = DateTime(agora.year, agora.month, agora.day, 23, 59, 59);
-          final ehHoje = (data!.isAfter(hojeInicio) && data!.isBefore(hojeFim)) ||
-              data!.isAtSameMomentAs(hojeInicio) ||
-              data!.isAtSameMomentAs(hojeFim);
-          return data!.isAfter(hojeFim) || ehHoje;
+          final ehHoje = (d.isAfter(hojeInicio) && d.isBefore(hojeFim)) ||
+              d.isAtSameMomentAs(hojeInicio) ||
+              d.isAtSameMomentAs(hojeFim);
+          return d.isAfter(hojeFim) || ehHoje;
         }
 
         final agendadosFiltrados = todos
@@ -1065,30 +1122,8 @@ class MinhasVisitasTabState extends State<MinhasVisitasTab>
                     ..clear()
                     ..addAll(base.map((c) => (c['endereco'] ?? '').toString().trim()).where((s) => s.isNotEmpty));
 
-                  final agora = DateTime.now();
-                  final hojeIni = DateTime(agora.year, agora.month, agora.day, 0, 0, 0);
-
-                  bool isPassado(Map<String, dynamic> c) {
-                    final ds = c['data_visita']?.toString();
-                    if (ds == null || ds.isEmpty) return false;
-                    try {
-                      DateTime d = DateTime.parse(ds).toLocal();
-                      final hs = c['hora_visita']?.toString();
-                      if (hs != null && hs.isNotEmpty) {
-                        final p = hs.split(':');
-                        int part(int i) => i < p.length ? int.tryParse(p[i]) ?? 0 : 0;
-                        d = DateTime(d.year, d.month, d.day, part(0), part(1), part(2));
-                      } else {
-                        d = DateTime(d.year, d.month, d.day, 0, 0, 0);
-                      }
-                      return d.isBefore(hojeIni);
-                    } catch (_) {
-                      return false;
-                    }
-                  }
-
-                  cacheProximas ??= base.where((c) => !isPassado(c)).toList();
-                  cacheFinalizados ??= base.where(isPassado).toList();
+                  cacheProximas ??= base.where(matchProximas).toList();
+                  cacheFinalizados ??= base.where(matchFinalizadas).toList();
 
                   final vmsProx = cacheProximas!.map(toVM).toList()..sort(_cmp);
                   final vmsFin = cacheFinalizados!.map(toVM).toList()..sort(_cmp);
