@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import 'cadastrar_consultor.dart';
 import 'vendas.dart';
 
-const _brandRed = Color(0xFFEA3124);
-const _brandRedDark = Color(0xFFD12B20);
+const _brandRed = Color(0xFFEA3124);   
+const _brandRedDark = Color(0xFFD12B20);  
+const _brandRedCmyk = Color(0xFF7A1315);  
+const _grayK50Brand = Color(0xFF939598);  
 const _bg = Color(0xFFF6F6F8);
 const _textPrimary = Color(0xFF222222);
 const _muted = Color(0xFF8F8F95);
@@ -18,12 +20,17 @@ class BrPhoneTextInputFormatter extends TextInputFormatter {
     final raw = newValue.text.replaceAll(_digitsOnly, '');
     final mask = raw.length > 10 ? '(##) #####-####' : '(##) ####-####';
     final formatted = _applyMask(raw, mask);
-    return TextEditingValue(text: formatted, selection: TextSelection.collapsed(offset: formatted.length), composing: TextRange.empty);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+      composing: TextRange.empty,
+    );
   }
   String _applyMask(String digits, String mask) {
     final b = StringBuffer(); int i = 0;
     for (int m = 0; m < mask.length && i < digits.length; m++) {
-      final ch = mask[m]; if (ch == '#') { b.write(digits[i]); i++; } else { b.write(ch); }
+      final ch = mask[m];
+      if (ch == '#') { b.write(digits[i]); i++; } else { b.write(ch); }
     }
     return b.toString();
   }
@@ -268,6 +275,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
                     onEditar: () => _openEditarConsultor(c),
                     onApagar: () => _confirmarExcluir(c),
                     onAbrirDados: () => _openDadosConsultor(c),
+                    ativoTheme: _filtroAtivo,
                   ),
                 ),
                 if (showLoadMore)
@@ -297,39 +305,113 @@ class _ToggleAtivos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 32,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE3E3E6)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _seg('Ativos', ativos, () => onChanged(true)),
-          _seg('Desligados', !ativos, () => onChanged(false)),
-        ],
+    const borderColor = Color(0xFFE3E3E6);
+    final Color pillColor = ativos
+        ? const Color(0x1A7A1315) // 10% vermelho
+        : const Color(0x1A939598); // 10% cinza
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 36,
+        width: 200,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              alignment: ativos ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                heightFactor: 1.0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))],
+                  ),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                _SegItem(
+                  label: 'Ativos',
+                  selected: ativos,
+                  selectedColor: _brandRedCmyk,
+                  unselectedColor: _grayK50Brand.withOpacity(0.85),
+                  onTap: () => onChanged(true),
+                ),
+                _SegItem(
+                  label: 'Desligados',
+                  selected: !ativos,
+                  selectedColor: _grayK50Brand,
+                  unselectedColor: _brandRedCmyk.withOpacity(0.85),
+                  onTap: () => onChanged(false),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _seg(String label, bool selected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFECEA) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? _brandRed : const Color(0xFF5A5A60),
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
+class _SegItem extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color selectedColor;
+  final Color unselectedColor;
+  final VoidCallback onTap;
+  const _SegItem({
+    required this.label,
+    required this.selected,
+    required this.selectedColor,
+    required this.unselectedColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? selectedColor : unselectedColor;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            style: TextStyle(
+              color: color,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 12,
+              letterSpacing: 0.2,
+            ),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: selected ? 1.0 : 0.9,
+              child: Center(
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 180),
+                  scale: selected ? 1.02 : 1.0,
+                  curve: Curves.easeOut,
+                  child: Text(label),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -349,6 +431,8 @@ class _ConsultorCard extends StatelessWidget {
   final VoidCallback onEditar;
   final VoidCallback onApagar;
   final VoidCallback onAbrirDados;
+  final bool ativoTheme;
+
   const _ConsultorCard({
     super.key,
     required this.c,
@@ -356,6 +440,7 @@ class _ConsultorCard extends StatelessWidget {
     required this.onEditar,
     required this.onApagar,
     required this.onAbrirDados,
+    required this.ativoTheme,
   });
 
   @override
@@ -380,20 +465,17 @@ class _ConsultorCard extends StatelessWidget {
                 _AvatarPerfil(ativo: c.ativo),
                 const SizedBox(width: 10),
                 Expanded(child: _NomeMatricula(nome: c.nome, matricula: c.matricula, ativo: c.ativo)),
-                PillButton(
+                _StatusButtonOutlined(
                   onPressed: onAbrirDados,
-                  icon: const Icon(Icons.receipt_long_rounded, size: 16, color: _brandRed),
-                  label: 'Status',
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ativoTheme: ativoTheme,
                 ),
-                const SizedBox(width: 8),
-                if (!c.ativo) _BadgeDesligado(),
                 const SizedBox(width: 8),
                 if (c.ativo) ...[
                   PillIconButton(onPressed: onEditar, icon: Icons.edit_outlined, radius: 10, size: 16),
                   const SizedBox(width: 8),
                   PillIconButton(onPressed: onApagar, icon: Icons.delete_outline_rounded, radius: 10, size: 16),
-                ],
+                ] else
+                  const _BadgeDesligado(),
               ],
             ),
             const SizedBox(height: 12),
@@ -413,6 +495,35 @@ class _ConsultorCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusButtonOutlined extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool ativoTheme; 
+  const _StatusButtonOutlined({required this.onPressed, required this.ativoTheme});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color line = ativoTheme ? _brandRedCmyk : _grayK50Brand;
+    return ConstrainedBox(
+      constraints: const BoxConstraints.tightFor(height: 36, width: 92),
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(Icons.receipt_long_rounded, size: 16, color: line),
+        label: Text('Status', style: TextStyle(color: line, fontWeight: FontWeight.w700, fontSize: 13, height: 1.0)),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: BorderSide(color: line, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(92, 36),
+          maximumSize: const Size(92, 36),
+          visualDensity: VisualDensity.compact,
         ),
       ),
     );
@@ -444,7 +555,7 @@ class _AvatarPerfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = ativo ? _brandRed : const Color(0xFF8C9199);
+    final bg = ativo ? _brandRedCmyk : const Color(0xFF8C9199);
     final icon = ativo ? Icons.person : Icons.person_off_outlined;
     return Container(
       width: 44,
@@ -683,6 +794,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                           ],
                         ),
                         const SizedBox(height: 12),
+
                         _FieldLabel(icon: Icons.person_outline, text: 'Nome Completo', requiredMark: true),
                         const SizedBox(height: 6),
                         TextFormField(
@@ -691,6 +803,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                           decoration: _dec('Ex: João da Silva Santos'),
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Nome é obrigatório' : null,
                         ),
+
                         const SizedBox(height: 10),
                         _FieldLabel(icon: Icons.phone_outlined, text: 'Telefone', requiredMark: true),
                         const SizedBox(height: 6),
@@ -707,6 +820,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                             return null;
                           },
                         ),
+
                         const SizedBox(height: 10),
                         _FieldLabel(icon: Icons.alternate_email, text: 'Email', requiredMark: true),
                         const SizedBox(height: 6),
@@ -721,6 +835,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                             return ok ? null : 'Email inválido';
                           },
                         ),
+
                         const SizedBox(height: 10),
                         _FieldLabel(icon: Icons.tag, text: 'Matrícula', requiredMark: false, hintExtra: '(opcional)'),
                         const SizedBox(height: 6),
@@ -730,6 +845,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                           decoration: _dec('Ex: 001'),
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         ),
+
                         const SizedBox(height: 14),
                         Row(
                           children: [
