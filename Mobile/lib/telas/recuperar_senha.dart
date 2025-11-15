@@ -22,6 +22,7 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
+        redirectTo: 'ademiconproject://reset-password',
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,7 +88,6 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                     height: 120,
                   ),
                   const SizedBox(height: 16),
-
                   const Text(
                     "Recuperar Senha",
                     style: TextStyle(
@@ -97,7 +97,6 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   const Text(
                     "Informe seu e-mail cadastrado para receber um link de redefinição de senha.",
                     textAlign: TextAlign.center,
@@ -107,7 +106,6 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                     ),
                   ),
                   const SizedBox(height: 32),
-
                   Form(
                     key: _formKey,
                     child: Column(
@@ -152,8 +150,7 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                             if (value == null || value.isEmpty) {
                               return 'Informe o e-mail';
                             }
-                            final emailRegex =
-                                RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
                             if (!emailRegex.hasMatch(value)) {
                               return 'E-mail inválido';
                             }
@@ -161,7 +158,6 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                           },
                         ),
                         const SizedBox(height: 24),
-
                         SizedBox(
                           width: double.infinity,
                           height: 52,
@@ -189,9 +185,7 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
                                   ),
                           ),
                         ),
-
                         const SizedBox(height: 16),
-
                         TextButton(
                           onPressed: () => Navigator.pop(context),
                           child: const Text(

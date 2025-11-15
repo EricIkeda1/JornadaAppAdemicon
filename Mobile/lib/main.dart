@@ -1,3 +1,4 @@
+import 'dart:async';                   
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,11 +9,15 @@ import 'telas/login.dart';
 import 'telas/gestor/home_gestor.dart';
 import 'telas/consultor/home_consultor.dart';
 import 'telas/recuperar_senha.dart';
+import 'telas/nova_senha.dart';           
 import 'services/notification_service.dart';
 import 'services/cliente_service.dart';
 
+
 FlutterLocalNotificationsPlugin? flutterLocalNotificationsPlugin;
 ClienteService? clienteService;
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> loadEnv() async {
   try {
@@ -43,7 +48,9 @@ void main() async {
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     debugPrint('❌ URL ou chave do Supabase não encontradas no .env');
-    runApp(const ErrorScreen(error: 'Configuração do Supabase incorreta.\nVerifique o arquivo .env.'));
+    runApp(const ErrorScreen(
+      error: 'Configuração do Supabase incorreta.\nVerifique o arquivo .env.',
+    ));
     return;
   }
 
@@ -56,7 +63,10 @@ void main() async {
   } catch (e, s) {
     debugPrint('❌ Falha ao inicializar Supabase: $e');
     debugPrint('❌ Stack trace: $s');
-    runApp(const ErrorScreen(error: 'Erro ao conectar ao banco de dados.\nVerifique sua conexão com a internet.'));
+    runApp(const ErrorScreen(
+      error:
+          'Erro ao conectar ao banco de dados.\nVerifique sua conexão com a internet.',
+    ));
     return;
   }
 
@@ -79,6 +89,30 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      final session = data.session;
+      debugPrint('🔐 Auth event: $event');
+
+      if (event == AuthChangeEvent.passwordRecovery && session != null) {
+
+        navigatorKey.currentState?.pushNamed('/nova-senha');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ThemeData(
@@ -91,6 +125,7 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       title: 'ADEMICON Londrina',
       theme: theme,
+      navigatorKey: navigatorKey,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -105,6 +140,7 @@ class _MyAppState extends State<MyApp> {
         '/gestor': (context) => const HomeGestor(),
         '/consultor': (context) => const HomeConsultor(),
         '/recuperar': (context) => const RecuperarSenhaPage(),
+        '/nova-senha': (context) => const NovaSenhaPage(),
       },
     );
   }
@@ -150,7 +186,7 @@ class UserTypeRedirector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final client = Supabase.instance.client;
-    final userId = client.auth.currentSession?.user?.id; 
+    final userId = client.auth.currentSession?.user.id;
     if (userId == null) {
       return const Scaffold(
         body: Center(
@@ -192,7 +228,7 @@ class UserTypeRedirector extends StatelessWidget {
 
         if (snapshot.hasError) {
           debugPrint('❌ Erro ao carregar tipo: ${snapshot.error}');
-          return Scaffold(
+          return const Scaffold(
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -249,5 +285,5 @@ class ErrorScreen extends StatelessWidget {
         ),
       ),
     );
-  }
+  } 
 }
