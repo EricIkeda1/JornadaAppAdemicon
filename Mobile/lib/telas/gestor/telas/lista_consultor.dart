@@ -4,28 +4,28 @@ import 'package:flutter/services.dart';
 import 'cadastrar_consultor.dart';
 import 'vendas.dart';
 
-const _brandRed = Color(0xFFEA3124);   
-const _brandRedDark = Color(0xFFD12B20);  
-const _brandRedCmyk = Color(0xFF7A1315);  
-const _grayK50Brand = Color(0xFF939598);  
+const _brandRed = Color(0xFFEA3124);
+const _brandRedDark = Color(0xFFD12B20);
+const _brandRedCmyk = Color(0xFF7A1315);
+const _grayK50Brand = Color(0xFF939598);
 const _bg = Color(0xFFF6F6F8);
 const _textPrimary = Color(0xFF222222);
 const _muted = Color(0xFF8F8F95);
 
+const brandDeepRed = Color(0xFF380202);
+
 class BrPhoneTextInputFormatter extends TextInputFormatter {
   const BrPhoneTextInputFormatter();
   static final _digitsOnly = RegExp(r'\D');
+
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
     final raw = newValue.text.replaceAll(_digitsOnly, '');
     final mask = raw.length > 10 ? '(##) #####-####' : '(##) ####-####';
     final formatted = _applyMask(raw, mask);
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-      composing: TextRange.empty,
-    );
+    return TextEditingValue(text: formatted, selection: TextSelection.collapsed(offset: formatted.length), composing: TextRange.empty);
   }
+
   String _applyMask(String digits, String mask) {
     final b = StringBuffer(); int i = 0;
     for (int m = 0; m < mask.length && i < digits.length; m++) {
@@ -34,6 +34,7 @@ class BrPhoneTextInputFormatter extends TextInputFormatter {
     }
     return b.toString();
   }
+
   String formatStatic(String input) {
     final raw = input.replaceAll(_digitsOnly, '');
     if (raw.isEmpty) return '';
@@ -46,6 +47,7 @@ class ConsultoresRoot extends StatefulWidget {
   final VoidCallback? onCadastrar;
   final PageController? pageController;
   const ConsultoresRoot({super.key, this.onCadastrar, this.pageController});
+
   @override
   State<ConsultoresRoot> createState() => _ConsultoresRootState();
 }
@@ -88,11 +90,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
   }
 
   Future<void> _fetchTotalCount() async {
-    final res = await _client
-        .from('consultores')
-        .select('id')
-        .eq('ativo', _filtroAtivo)
-        .count(CountOption.exact);
+    final res = await _client.from('consultores').select('id').eq('ativo', _filtroAtivo).count(CountOption.exact);
     setState(() => _totalCount = res.count ?? 0);
   }
 
@@ -144,12 +142,8 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
       widget.onCadastrar!.call();
       return;
     }
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const CadastrarConsultorPage()),
-    );
-    if (ok == true) {
-      await _fetchFirstPage();
-    }
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CadastrarConsultorPage()));
+    if (ok == true) await _fetchFirstPage();
   }
 
   Future<void> _openEditarConsultor(_ConsultorView c) async {
@@ -159,9 +153,7 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
       barrierColor: Colors.black54,
       builder: (ctx) => _EditarConsultorDialog(consultor: c, phoneFmt: _phoneFmt),
     );
-    if (changed == true) {
-      await _fetchFirstPage();
-    }
+    if (changed == true) await _fetchFirstPage();
   }
 
   Future<void> _confirmarExcluir(_ConsultorView c) async {
@@ -174,7 +166,6 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
     if (confirmed != true) return;
     try {
       await _client.from('consultores').update({'ativo': false}).eq('id', c.id);
-
       if (_filtroAtivo) {
         setState(() {
           _consultores.removeWhere((x) => x.id == c.id);
@@ -182,23 +173,14 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
           _visibleCount = _consultores.length;
         });
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Conta marcada como inativa'), backgroundColor: Colors.green),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Conta marcada como inativa'), backgroundColor: Colors.green));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao atualizar: $e'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao atualizar: $e'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> _openDadosConsultor(_ConsultorView c) async {
-    VendasPage.setSelectedConsultor(
-      consultorId: c.id,
-      consultorUid: c.uid,
-      nomeConsultor: c.nome,
-    );
+    VendasPage.setSelectedConsultor(consultorId: c.id, consultorUid: c.uid, nomeConsultor: c.nome);
     final pc = widget.pageController;
     if (pc != null) {
       await pc.animateToPage(1, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
@@ -225,21 +207,15 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.group, color: _brandRed, size: 20),
-                    const SizedBox(width: 6),
-                    const Text('Consultores', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _textPrimary)),
-                    const Spacer(),
-                    _ToggleAtivos(onChanged: _trocarAba, ativos: _filtroAtivo),
-                  ],
-                ),
+                Row(children: [
+                  const Icon(Icons.group, color: _brandRed, size: 20),
+                  const SizedBox(width: 6),
+                  const Text('Consultores', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _textPrimary)),
+                  const Spacer(),
+                  _ToggleAtivos(onChanged: _trocarAba, ativos: _filtroAtivo),
+                ]),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _ChipTotal(count: _totalCount),
-                  ],
-                ),
+                Row(children: [ _ChipTotal(count: _totalCount) ]),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -248,36 +224,20 @@ class _ConsultoresRootState extends State<ConsultoresRoot> {
                     onPressed: _openCadastrarConsultor,
                     icon: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white, size: 20),
                     label: const Text('Cadastrar Novo Consultor', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _brandRed,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: _brandRed, elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   ),
                 ),
                 const SizedBox(height: 14),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
-                  ),
-                if (_loading && _visibleCount == 0)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-                ..._consultores.map(
-                  (c) => _ConsultorCard(
-                    c: c,
-                    phoneFmt: _phoneFmt,
-                    onEditar: () => _openEditarConsultor(c),
-                    onApagar: () => _confirmarExcluir(c),
-                    onAbrirDados: () => _openDadosConsultor(c),
-                    ativoTheme: _filtroAtivo,
-                  ),
-                ),
+                if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+                if (_loading && _visibleCount == 0) const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 24), child: CircularProgressIndicator())),
+                ..._consultores.map((c) => _ConsultorCard(
+                      c: c,
+                      phoneFmt: _phoneFmt,
+                      onEditar: () => _openEditarConsultor(c),
+                      onApagar: () => _confirmarExcluir(c),
+                      onAbrirDados: () => _openDadosConsultor(c),
+                      ativoTheme: _filtroAtivo,
+                    )),
                 if (showLoadMore)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -306,10 +266,7 @@ class _ToggleAtivos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const borderColor = Color(0xFFE3E3E6);
-    final Color pillColor = ativos
-        ? const Color(0x1A7A1315) // 10% vermelho
-        : const Color(0x1A939598); // 10% cinza
-
+    final Color pillColor = ativos ? const Color(0x1A7A1315) : const Color(0x1A939598);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(10),
@@ -317,52 +274,27 @@ class _ToggleAtivos extends StatelessWidget {
         height: 36,
         width: 200,
         padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            AnimatedAlign(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              alignment: ativos ? Alignment.centerLeft : Alignment.centerRight,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                heightFactor: 1.0,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: pillColor,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))],
-                  ),
-                ),
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(10)),
+        child: Stack(fit: StackFit.expand, children: [
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            alignment: ativos ? Alignment.centerLeft : Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              heightFactor: 1.0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(color: pillColor, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))]),
               ),
             ),
-            Row(
-              children: [
-                _SegItem(
-                  label: 'Ativos',
-                  selected: ativos,
-                  selectedColor: _brandRedCmyk,
-                  unselectedColor: _grayK50Brand.withOpacity(0.85),
-                  onTap: () => onChanged(true),
-                ),
-                _SegItem(
-                  label: 'Desligados',
-                  selected: !ativos,
-                  selectedColor: _grayK50Brand,
-                  unselectedColor: _brandRedCmyk.withOpacity(0.85),
-                  onTap: () => onChanged(false),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          Row(children: [
+            _SegItem(label: 'Ativos', selected: ativos, selectedColor: _brandRedCmyk, unselectedColor: _grayK50Brand.withOpacity(0.85), onTap: () => onChanged(true)),
+            _SegItem(label: 'Desligados', selected: !ativos, selectedColor: _grayK50Brand, unselectedColor: _brandRedCmyk.withOpacity(0.85), onTap: () => onChanged(false)),
+          ]),
+        ]),
       ),
     );
   }
@@ -374,13 +306,7 @@ class _SegItem extends StatelessWidget {
   final Color selectedColor;
   final Color unselectedColor;
   final VoidCallback onTap;
-  const _SegItem({
-    required this.label,
-    required this.selected,
-    required this.selectedColor,
-    required this.unselectedColor,
-    required this.onTap,
-  });
+  const _SegItem({required this.label, required this.selected, required this.selectedColor, required this.unselectedColor, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -394,23 +320,11 @@ class _SegItem extends StatelessWidget {
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
-            style: TextStyle(
-              color: color,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              fontSize: 12,
-              letterSpacing: 0.2,
-            ),
+            style: TextStyle(color: color, fontWeight: selected ? FontWeight.w800 : FontWeight.w600, fontSize: 12, letterSpacing: 0.2),
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 180),
               opacity: selected ? 1.0 : 0.9,
-              child: Center(
-                child: AnimatedScale(
-                  duration: const Duration(milliseconds: 180),
-                  scale: selected ? 1.02 : 1.0,
-                  curve: Curves.easeOut,
-                  child: Text(label),
-                ),
-              ),
+              child: Center(child: AnimatedScale(duration: const Duration(milliseconds: 180), scale: selected ? 1.02 : 1.0, curve: Curves.easeOut, child: Text(label))),
             ),
           ),
         ),
@@ -433,69 +347,60 @@ class _ConsultorCard extends StatelessWidget {
   final VoidCallback onAbrirDados;
   final bool ativoTheme;
 
-  const _ConsultorCard({
-    super.key,
-    required this.c,
-    required this.phoneFmt,
-    required this.onEditar,
-    required this.onApagar,
-    required this.onAbrirDados,
-    required this.ativoTheme,
-  });
+  const _ConsultorCard({super.key, required this.c, required this.phoneFmt, required this.onEditar, required this.onApagar, required this.onAbrirDados, required this.ativoTheme});
 
   @override
   Widget build(BuildContext context) {
     final fone = phoneFmt.formatStatic(c.telefone);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))],
-        border: Border.all(color: const Color(0x10A0A0A0), width: 1),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))], border: Border.all(color: const Color(0x10A0A0A0), width: 1)),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _AvatarPerfil(ativo: c.ativo),
+            const SizedBox(width: 10),
+            Expanded(child: _NomeMatricula(nome: c.nome, matricula: c.matricula, ativo: c.ativo)),
+            _StatusButtonOutlined(onPressed: onAbrirDados, ativoTheme: ativoTheme),
+            const SizedBox(width: 8),
+            if (c.ativo) ...[
+              PillIconButton(onPressed: onEditar, icon: Icons.edit_outlined, radius: 10, size: 16),
+              const SizedBox(width: 8),
+              PillIconButton(onPressed: onApagar, icon: Icons.delete_outline_rounded, radius: 10, size: 16),
+            ] else
+              const _BadgeDesligado(),
+          ]),
+          const SizedBox(height: 12),
+
+          // Telefone
+          Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _AvatarPerfil(ativo: c.ativo),
-                const SizedBox(width: 10),
-                Expanded(child: _NomeMatricula(nome: c.nome, matricula: c.matricula, ativo: c.ativo)),
-                _StatusButtonOutlined(
-                  onPressed: onAbrirDados,
-                  ativoTheme: ativoTheme,
-                ),
+                const Icon(Icons.phone_in_talk_rounded, size: 16, color: _muted),
                 const SizedBox(width: 8),
-                if (c.ativo) ...[
-                  PillIconButton(onPressed: onEditar, icon: Icons.edit_outlined, radius: 10, size: 16),
-                  const SizedBox(width: 8),
-                  PillIconButton(onPressed: onApagar, icon: Icons.delete_outline_rounded, radius: 10, size: 16),
-                ] else
-                  const _BadgeDesligado(),
+                Text(fone.isEmpty ? '—' : fone, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14, height: 1.2)),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
+          ),
+
+          const SizedBox(height: 6),
+
+          // E-mail alinhado com telefone
+          Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.phone, size: 16, color: _muted),
-                const SizedBox(width: 6),
-                Text(fone.isEmpty ? '—' : fone, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14)),
+                const Icon(Icons.alternate_email_rounded, size: 16, color: _muted),
+                const SizedBox(width: 8),
+                Flexible(child: Text(c.email, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14, height: 1.2), overflow: TextOverflow.ellipsis)),
               ],
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.email_outlined, size: 16, color: _muted),
-                const SizedBox(width: 6),
-                Text(c.email, style: const TextStyle(color: Color(0xFF3E3E44), fontSize: 14)),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
@@ -503,7 +408,7 @@ class _ConsultorCard extends StatelessWidget {
 
 class _StatusButtonOutlined extends StatelessWidget {
   final VoidCallback? onPressed;
-  final bool ativoTheme; 
+  final bool ativoTheme;
   const _StatusButtonOutlined({required this.onPressed, required this.ativoTheme});
 
   @override
@@ -534,18 +439,7 @@ class _BadgeDesligado extends StatelessWidget {
   const _BadgeDesligado({super.key});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFED4B4B),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
-      ),
-      child: const Text(
-        'DESLIGADO',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontSize: 12),
-      ),
-    );
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFED4B4B), borderRadius: BorderRadius.circular(10), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))]), child: const Text('DESLIGADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontSize: 12)));
   }
 }
 
@@ -557,12 +451,7 @@ class _AvatarPerfil extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = ativo ? _brandRedCmyk : const Color(0xFF8C9199);
     final icon = ativo ? Icons.person : Icons.person_off_outlined;
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Icon(icon, color: Colors.white, size: 22),
-    );
+    return Container(width: 44, height: 44, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: Colors.white, size: 22));
   }
 }
 
@@ -574,22 +463,12 @@ class _NomeMatricula extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final styleNome = TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      color: const Color(0xFF1E1E22),
-      decoration: ativo ? TextDecoration.none : TextDecoration.lineThrough,
-      decorationColor: const Color(0xFF8C9199),
-      decorationThickness: 1.4,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(nome, style: styleNome),
-        const SizedBox(height: 4),
-        Text('Mat. ${matricula.isEmpty ? '—' : matricula}', style: const TextStyle(fontSize: 12, color: Color(0xFF9A9AA0), height: 1.0)),
-      ],
-    );
+    final styleNome = TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: const Color(0xFF1E1E22), decoration: ativo ? TextDecoration.none : TextDecoration.lineThrough, decorationColor: const Color(0xFF8C9199), decorationThickness: 1.4);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(nome, style: styleNome),
+      const SizedBox(height: 4),
+      Text('Mat. ${matricula.isEmpty ? '—' : matricula}', style: const TextStyle(fontSize: 12, color: Color(0xFF9A9AA0), height: 1.0)),
+    ]);
   }
 }
 
@@ -601,16 +480,9 @@ class PillButton extends StatelessWidget {
   final double radius;
   final bool dense;
   const PillButton({super.key, this.onPressed, this.icon, this.label, this.padding, this.radius = 10, this.dense = true});
+
   @override
   Widget build(BuildContext context) {
-    final child = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) icon!,
-        if (icon != null && label != null) const SizedBox(width: 6),
-        if (label != null) Text(label!, style: const TextStyle(color: _brandRed, fontWeight: FontWeight.w600, fontSize: 14, letterSpacing: 0.2)),
-      ],
-    );
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
@@ -622,7 +494,11 @@ class PillButton extends StatelessWidget {
         minimumSize: const Size(0, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: child,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) icon!,
+        if (icon != null && label != null) const SizedBox(width: 6),
+        if (label != null) Text(label!, style: const TextStyle(color: _brandRed, fontWeight: FontWeight.w600, fontSize: 14, letterSpacing: 0.2)),
+      ]),
     );
   }
 }
@@ -633,20 +509,21 @@ class PillIconButton extends StatelessWidget {
   final double size;
   final double radius;
   const PillIconButton({super.key, required this.onPressed, required this.icon, this.size = 16, this.radius = 10});
+
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: _brandRed,
+        foregroundColor: brandDeepRed,
         backgroundColor: Colors.white,
-        side: const BorderSide(color: _brandRed, width: 1.5),
+        side: const BorderSide(color: brandDeepRed, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
         padding: const EdgeInsets.all(8),
         minimumSize: const Size(36, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Icon(icon, size: size, color: _brandRed),
+      ).merge(ButtonStyle(overlayColor: MaterialStateProperty.resolveWith((s) => brandDeepRed.withOpacity(s.contains(MaterialState.pressed) ? 0.12 : 0.08)))),
+      child: Icon(icon, size: size, color: brandDeepRed),
     );
   }
 }
@@ -654,15 +531,10 @@ class PillIconButton extends StatelessWidget {
 class _ChipTotal extends StatelessWidget {
   final int count;
   const _ChipTotal({required this.count});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 26,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(color: _brandRed, borderRadius: BorderRadius.circular(8)),
-      alignment: Alignment.center,
-      child: Text('$count consultores', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12, height: 1.0)),
-    );
+    return Container(height: 26, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: _brandRed, borderRadius: BorderRadius.circular(8)), alignment: Alignment.center, child: Text('$count consultores', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12, height: 1.0)));
   }
 }
 
@@ -712,7 +584,7 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE3E3E6))),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE3E3E6))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _brandRed)),
+        focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: brandDeepRed)),
       );
 
   Future<void> _save() async {
@@ -720,24 +592,17 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
     setState(() => _saving = true);
     try {
       final telDigits = _telCtrl.text.replaceAll(RegExp(r'\D'), '');
-      await _client
-          .from('consultores')
-          .update({
-            'nome': _nomeCtrl.text.trim(),
-            'telefone': telDigits,
-            'email': _emailCtrl.text.trim(),
-            'matricula': _matCtrl.text.trim().isEmpty ? null : _matCtrl.text.trim(),
-          })
-          .eq('id', widget.consultor.id);
+      await _client.from('consultores').update({
+        'nome': _nomeCtrl.text.trim(),
+        'telefone': telDigits,
+        'email': _emailCtrl.text.trim(),
+        'matricula': _matCtrl.text.trim().isEmpty ? null : _matCtrl.text.trim(),
+      }).eq('id', widget.consultor.id);
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Alterações salvas com sucesso'), backgroundColor: Colors.green),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alterações salvas com sucesso'), backgroundColor: Colors.green));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao salvar: $e'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao salvar: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -764,137 +629,97 @@ class _EditarConsultorDialogState extends State<_EditarConsultorDialog> {
                 child: Form(
                   key: _formKey,
                   child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 40, height: 40,
-                              decoration: BoxDecoration(color: const Color(0xFFFFECEA), borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(Icons.edit, color: _brandRed),
+                    child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Row(children: [
+                        Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFFFFECEA), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.edit, color: _brandRed)),
+                        const SizedBox(width: 10),
+                        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Editar Consultor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          SizedBox(height: 2),
+                          Text('Atualize as informações do consultor abaixo', style: TextStyle(color: Colors.black54, fontSize: 13)),
+                        ])),
+                        IconButton(tooltip: 'Fechar', onPressed: _saving ? null : () => Navigator.of(context).pop(false), icon: const Icon(Icons.close, color: Colors.black54)),
+                      ]),
+                      const SizedBox(height: 12),
+                      _FieldLabel(icon: Icons.person_outline, text: 'Nome Completo', requiredMark: true),
+                      const SizedBox(height: 6),
+                      TextFormField(controller: _nomeCtrl, textInputAction: TextInputAction.next, decoration: _dec('Ex: João da Silva Santos'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Nome é obrigatório' : null),
+                      const SizedBox(height: 10),
+                      _FieldLabel(icon: Icons.phone_outlined, text: 'Telefone', requiredMark: true),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _telCtrl,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        decoration: _dec('(11) 98765-4321'),
+                        inputFormatters: [widget.phoneFmt],
+                        validator: (v) {
+                          final raw = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+                          if (raw.isEmpty) return 'Telefone é obrigatório';
+                          if (raw.length != 10 && raw.length != 11) return 'Telefone inválido';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _FieldLabel(icon: Icons.alternate_email, text: 'Email', requiredMark: true),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: _dec('consultor@ademicon.com.br'),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Email é obrigatório';
+                          final ok = RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim());
+                          return ok ? null : 'Email inválido';
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _FieldLabel(icon: Icons.tag, text: 'Matrícula', requiredMark: false, hintExtra: '(opcional)'),
+                      const SizedBox(height: 6),
+                      TextFormField(controller: _matCtrl, textInputAction: TextInputAction.done, decoration: _dec('Ex: 001'), inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
+                      const SizedBox(height: 14),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: const BorderSide(color: Color(0xFFE3E3E6)),
+                              backgroundColor: Colors.white,
                             ),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Editar Consultor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                                  SizedBox(height: 2),
-                                  Text('Atualize as informações do consultor abaixo', style: TextStyle(color: Colors.black54, fontSize: 13)),
-                                ],
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 46,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: [_brandRed, _brandRedDark], begin: Alignment.centerLeft, end: Alignment.centerRight),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
                               ),
-                            ),
-                            IconButton(
-                              tooltip: 'Fechar',
-                              onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-                              icon: const Icon(Icons.close, color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        _FieldLabel(icon: Icons.person_outline, text: 'Nome Completo', requiredMark: true),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _nomeCtrl,
-                          textInputAction: TextInputAction.next,
-                          decoration: _dec('Ex: João da Silva Santos'),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Nome é obrigatório' : null,
-                        ),
-
-                        const SizedBox(height: 10),
-                        _FieldLabel(icon: Icons.phone_outlined, text: 'Telefone', requiredMark: true),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _telCtrl,
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          decoration: _dec('(11) 98765-4321'),
-                          inputFormatters: [widget.phoneFmt],
-                          validator: (v) {
-                            final raw = v?.replaceAll(RegExp(r'\D'), '') ?? '';
-                            if (raw.isEmpty) return 'Telefone é obrigatório';
-                            if (raw.length != 10 && raw.length != 11) return 'Telefone inválido';
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 10),
-                        _FieldLabel(icon: Icons.alternate_email, text: 'Email', requiredMark: true),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          decoration: _dec('consultor@ademicon.com.br'),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Email é obrigatório';
-                            final ok = RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim());
-                            return ok ? null : 'Email inválido';
-                          },
-                        ),
-
-                        const SizedBox(height: 10),
-                        _FieldLabel(icon: Icons.tag, text: 'Matrícula', requiredMark: false, hintExtra: '(opcional)'),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _matCtrl,
-                          textInputAction: TextInputAction.done,
-                          decoration: _dec('Ex: 001'),
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        ),
-
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: ElevatedButton.icon(
+                                onPressed: _saving ? null : _save,
+                                icon: const Icon(Icons.save, color: Colors.white),
+                                label: _saving
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  side: const BorderSide(color: Color(0xFFE3E3E6)),
-                                  backgroundColor: Colors.white,
-                                ),
-                                child: const Text('Cancelar'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: SizedBox(
-                                height: 46,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [_brandRed, _brandRedDark],
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 3))],
-                                  ),
-                                  child: ElevatedButton.icon(
-                                    onPressed: _saving ? null : _save,
-                                    icon: const Icon(Icons.save, color: Colors.white),
-                                    label: _saving
-                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                        : const Text('Salvar Alterações', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
                                 ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ]),
+                    ]),
                   ),
                 ),
               ),
@@ -911,28 +736,17 @@ class _FieldLabel extends StatelessWidget {
   final String text;
   final bool requiredMark;
   final String? hintExtra;
-
   const _FieldLabel({required this.icon, required this.text, required this.requiredMark, this.hintExtra});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 26,
-          height: 26,
-          decoration: const BoxDecoration(color: Color(0xFFFFE9E7), shape: BoxShape.circle),
-          child: Icon(icon, size: 16, color: _brandRed),
-        ),
-        const SizedBox(width: 8),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
-        if (requiredMark) const Text(' *', style: TextStyle(color: Colors.red)),
-        if (hintExtra != null) ...[
-          const SizedBox(width: 6),
-          Text(hintExtra!, style: const TextStyle(color: Colors.black45, fontSize: 12)),
-        ],
-      ],
-    );
+    return Row(children: [
+      Container(width: 26, height: 26, decoration: const BoxDecoration(color: Color(0xFFFFE9E7), shape: BoxShape.circle), child: Icon(icon, size: 16, color: _brandRed)),
+      const SizedBox(width: 8),
+      Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
+      if (requiredMark) const Text(' *', style: TextStyle(color: Colors.red)),
+      if (hintExtra != null) ...[const SizedBox(width: 6), Text(hintExtra!, style: const TextStyle(color: Colors.black45, fontSize: 12))],
+    ]);
   }
 }
 
@@ -952,77 +766,22 @@ class _ConfirmExcluirDialog extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: const Color(0xFFFFECEA), borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.delete_outline, color: _brandRed),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(child: Text('Confirmar Exclusão', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-                    IconButton(
-                      tooltip: 'Fechar',
-                      onPressed: () => Navigator.of(context).pop(false),
-                      icon: const Icon(Icons.close, color: Colors.black54),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _BannerBox(
-                  color: const Color(0xFFFFE6E6),
-                  border: const Color(0xFFFFC6C6),
-                  icon: Icons.error_outline,
-                  iconColor: const Color(0xFFD32F2F),
-                  title: 'Tem certeza que deseja excluir este consultor?',
-                  subtitle: 'Esta ação não pode ser desfeita.',
-                  titleColor: const Color(0xFFD32F2F),
-                ),
-                const SizedBox(height: 10),
-                _BannerBox(
-                  color: const Color(0xFFFFF7E0),
-                  border: const Color(0xFFFFE7A8),
-                  icon: Icons.warning_amber_rounded,
-                  iconColor: const Color(0xFFB78900),
-                  title: 'Você já transferiu os leads deste consultor?',
-                  subtitle: 'Certifique-se de que todos os leads foram transferidos antes de excluir.',
-                  titleColor: const Color(0xFFB78900),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    icon: const Icon(Icons.delete_forever, color: _brandRed),
-                    label: const Text('Excluir conta', style: TextStyle(color: _brandRed, fontWeight: FontWeight.w700)),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: const BorderSide(color: Color(0xFFE3E3E6)),
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    icon: const Icon(Icons.close, color: Colors.black87),
-                    label: const Text('Cancelar', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: const BorderSide(color: Color(0xFFE3E3E6)),
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFFFFECEA), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.delete_outline, color: _brandRed)),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Confirmar Exclusão', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                IconButton(tooltip: 'Fechar', onPressed: () => Navigator.of(context).pop(false), icon: const Icon(Icons.close, color: Colors.black54)),
+              ]),
+              const SizedBox(height: 12),
+              _BannerBox(color: const Color(0xFFFFE6E6), border: const Color(0xFFFFC6C6), icon: Icons.error_outline, iconColor: const Color(0xFFD32F2F), title: 'Tem certeza que deseja excluir este consultor?', subtitle: 'Esta ação não pode ser desfeita.', titleColor: const Color(0xFFD32F2F)),
+              const SizedBox(height: 10),
+              _BannerBox(color: const Color(0xFFFFF7E0), border: const Color(0xFFFFE7A8), icon: Icons.warning_amber_rounded, iconColor: const Color(0xFFB78900), title: 'Você já transferiu os leads deste consultor?', subtitle: 'Certifique-se de que todos os leads foram transferidos antes de excluir.', titleColor: const Color(0xFFB78900)),
+              const SizedBox(height: 14),
+              SizedBox(width: double.infinity, height: 46, child: OutlinedButton.icon(onPressed: () => Navigator.of(context).pop(true), icon: const Icon(Icons.delete_forever, color: brandDeepRed), label: const Text('Excluir conta', style: TextStyle(color: brandDeepRed, fontWeight: FontWeight.w700)), style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: const BorderSide(color: Color(0xFFE3E3E6)), backgroundColor: Colors.white))),
+              const SizedBox(height: 8),
+              SizedBox(width: double.infinity, height: 46, child: OutlinedButton.icon(onPressed: () => Navigator.of(context).pop(false), icon: const Icon(Icons.close, color: Colors.black87), label: const Text('Cancelar', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)), style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: const BorderSide(color: Color(0xFFE3E3E6)), backgroundColor: Colors.white))),
+            ]),
           ),
         ),
       ),
@@ -1038,45 +797,23 @@ class _BannerBox extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color titleColor;
-
-  const _BannerBox({
-    super.key,
-    required this.color,
-    required this.border,
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.titleColor,
-  });
+  const _BannerBox({super.key, required this.color, required this.border, required this.icon, required this.iconColor, required this.title, required this.subtitle, required this.titleColor});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(color: titleColor, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                const Text('Esta ação não pode ser desfeita.', style: TextStyle(color: Colors.black87)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12), border: Border.all(color: border)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: iconColor),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: TextStyle(color: titleColor, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(subtitle, style: const TextStyle(color: Colors.black87)),
+        ])),
+      ]),
     );
   }
 }
