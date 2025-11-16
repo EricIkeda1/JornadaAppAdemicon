@@ -42,7 +42,7 @@ class _VendasPageState extends State<VendasPage>
   double totalVendas = 0;
   double mediaMensal = 0;
   double melhorMesValor = 0;
-  int periodoMeses = 6; // valor inicial, mas agora pode mudar
+  int periodoMeses = 6;
 
   double animTotal = 0;
   double animMedia = 0;
@@ -180,19 +180,16 @@ class _VendasPageState extends State<VendasPage>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        int sel = periodoMeses;
         return EditarPeriodoSheet(
           selecionado: periodoMeses,
           onSelecionar: (m) {
-            sel = m;
-            Navigator.pop(ctx, sel);
+            Navigator.pop(ctx, m);
           },
         );
       },
     );
 
     if (novo != null && novo != periodoMeses && mounted) {
-      // respeita o valor escolhido
       setState(() => periodoMeses = novo);
       await _carregarDados(animarSeNecessario: false);
     }
@@ -249,11 +246,13 @@ class _VendasPageState extends State<VendasPage>
         DateTime? primeiraVenda;
 
         if (uids.isNotEmpty) {
-          final valores = uids.map((e) => '"$e"').join(',');
+          final valores = uids.map((e) => '\"$e\"').join(',');
           final vendas = await _client
               .from('clientes')
-              .select('data_visita, status_negociacao, valor_proposta, consultor_uid_t')
-              .filter('status_negociacao', 'in', '("fechado","fechada","venda")')
+              .select(
+                  'data_visita, status_negociacao, valor_proposta, consultor_uid_t')
+              .filter(
+                  'status_negociacao', 'in', '(\"fechado\",\"fechada\",\"venda\")')
               .filter('consultor_uid_t', 'in', '($valores)')
               .order('data_visita', ascending: true);
 
@@ -283,60 +282,75 @@ class _VendasPageState extends State<VendasPage>
           }
         }
 
-        DateTime? inicioSerie = inicioTime;
-        if (inicioSerie == null ||
-            (primeiraVenda != null && primeiraVenda!.isBefore(inicioSerie))) {
-          inicioSerie = primeiraVenda;
-        }
+        const mesesPt = [
+          'jan',
+          'fev',
+          'mar',
+          'abr',
+          'mai',
+          'jun',
+          'jul',
+          'ago',
+          'set',
+          'out',
+          'nov',
+          'dez',
+        ];
 
-        if (inicioSerie == null) {
-          if (mounted) {
-            setState(() {
-              meses = [];
-              realizado = [];
-              totalVendas = 0;
-              mediaMensal = 0;
-              melhorMesValor = 0;
-              periodoMeses = 0;
-              animTotal = animMedia = animMelhor = animPeriodo = 0;
-            });
-          }
-          return;
-        }
+        List<String> ms = [];
+        List<double> rl = [];
 
-        // --------- semestre fixo de 6 meses ----------
         String fmtKey(DateTime d) =>
             '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
-        final DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
-        final int semestre = (start.month <= 6) ? 1 : 2;
+        if (periodoMeses == 6) {
+          final DateTime now = DateTime.now();
+          final int semestre = (now.month <= 6) ? 1 : 2;
 
-        const mesesPt = [
-          'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-          'jul', 'ago', 'set', 'out', 'nov', 'dez',
-        ];
-
-        final List<String> ms = [];
-        final List<double> rl = [];
-
-        if (semestre == 1) {
-          // jan a jun
-          for (int m = 1; m <= 6; m++) {
-            final d = DateTime(start.year, m, 1);
+          if (semestre == 1) {
+            for (int m = 1; m <= 6; m++) {
+              final d = DateTime(now.year, m, 1);
+              final key = fmtKey(d);
+              ms.add(mesesPt[m - 1]);
+              rl.add(somaMes[key] ?? 0.0);
+            }
+          } else {
+            for (int m = 7; m <= 12; m++) {
+              final d = DateTime(now.year, m, 1);
+              final key = fmtKey(d);
+              ms.add(mesesPt[m - 1]);
+              rl.add(somaMes[key] ?? 0.0);
+            }
+          }
+        } else if (periodoMeses == 12) {
+          final DateTime now = DateTime.now();
+          for (int m = 1; m <= 12; m++) {
+            final d = DateTime(now.year, m, 1);
             final key = fmtKey(d);
             ms.add(mesesPt[m - 1]);
             rl.add(somaMes[key] ?? 0.0);
           }
-        } else {
-          // jul a dez
-          for (int m = 7; m <= 12; m++) {
-            final d = DateTime(start.year, m, 1);
+        } else if (periodoMeses == 3) {
+          final DateTime now = DateTime.now();
+          final DateTime start =
+              DateTime(now.year, now.month - (periodoMeses - 1), 1);
+
+          for (int i = 0; i < periodoMeses; i++) {
+            final d = DateTime(start.year, start.month + i, 1);
+            final key = fmtKey(d);
+            final idxMes = (d.month - 1) % 12;
+            ms.add(mesesPt[idxMes]);
+            rl.add(somaMes[key] ?? 0.0);
+          }
+        } else if (periodoMeses == 9) {
+          final DateTime now = DateTime.now();
+          for (int m = 4; m <= 12; m++) {
+            final d = DateTime(now.year, m, 1);
             final key = fmtKey(d);
             ms.add(mesesPt[m - 1]);
             rl.add(somaMes[key] ?? 0.0);
           }
         }
-        // ---------------------------------------------------------
 
         if (mounted) {
           setState(() {
@@ -349,7 +363,6 @@ class _VendasPageState extends State<VendasPage>
           });
         }
       } else {
-        // --------- CASO INDIVIDUAL (CONSULTOR) ----------
         final bool temUid = (consultorUid != null && consultorUid!.isNotEmpty);
         final String filtroColuna = temUid ? 'consultor_uid_t' : 'consultor_id';
         final String? filtroValorOpt = temUid ? consultorUid : consultorId;
@@ -375,8 +388,10 @@ class _VendasPageState extends State<VendasPage>
 
         final vendas = await _client
             .from('clientes')
-            .select('data_visita, status_negociacao, valor_proposta, consultor_uid_t')
-            .filter('status_negociacao', 'in', '("fechado","fechada","venda")')
+            .select(
+                'data_visita, status_negociacao, valor_proposta, consultor_uid_t')
+            .filter(
+                'status_negociacao', 'in', '(\"fechado\",\"fechada\",\"venda\")')
             .eq(filtroColuna, filtroValorStr)
             .order('data_visita', ascending: true);
 
@@ -408,31 +423,67 @@ class _VendasPageState extends State<VendasPage>
           }
         }
 
-        final DateTime now = DateTime.now();
-        final DateTime inicioSerie =
-            (primeiraVenda ?? DateTime(now.year, now.month - (periodoMeses - 1), 1));
-
-        final DateTime start = DateTime(inicioSerie.year, inicioSerie.month, 1);
-        final int semestre = (start.month <= 6) ? 1 : 2;
-
         const mesesPt = [
-          'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-          'jul', 'ago', 'set', 'out', 'nov', 'dez',
+          'jan',
+          'fev',
+          'mar',
+          'abr',
+          'mai',
+          'jun',
+          'jul',
+          'ago',
+          'set',
+          'out',
+          'nov',
+          'dez',
         ];
 
-        final List<String> ms = [];
-        final List<double> rl = [];
+        List<String> ms = [];
+        List<double> rl = [];
 
-        if (semestre == 1) {
-          for (int m = 1; m <= 6; m++) {
-            final d = DateTime(start.year, m, 1);
+        if (periodoMeses == 6) {
+          final DateTime now = DateTime.now();
+          final int semestre = (now.month <= 6) ? 1 : 2;
+
+          if (semestre == 1) {
+            for (int m = 1; m <= 6; m++) {
+              final d = DateTime(now.year, m, 1);
+              final key = fmtKey(d);
+              ms.add(mesesPt[m - 1]);
+              rl.add(somaMes[key] ?? 0.0);
+            }
+          } else {
+            for (int m = 7; m <= 12; m++) {
+              final d = DateTime(now.year, m, 1);
+              final key = fmtKey(d);
+              ms.add(mesesPt[m - 1]);
+              rl.add(somaMes[key] ?? 0.0);
+            }
+          }
+        } else if (periodoMeses == 12) {
+          final DateTime now = DateTime.now();
+          for (int m = 1; m <= 12; m++) {
+            final d = DateTime(now.year, m, 1);
             final key = fmtKey(d);
             ms.add(mesesPt[m - 1]);
             rl.add(somaMes[key] ?? 0.0);
           }
-        } else {
-          for (int m = 7; m <= 12; m++) {
-            final d = DateTime(start.year, m, 1);
+        } else if (periodoMeses == 3) {
+          final DateTime now = DateTime.now();
+          final DateTime start =
+              DateTime(now.year, now.month - (periodoMeses - 1), 1);
+
+          for (int i = 0; i < periodoMeses; i++) {
+            final d = DateTime(start.year, start.month + i, 1);
+            final key = fmtKey(d);
+            final idxMes = (d.month - 1) % 12;
+            ms.add(mesesPt[idxMes]);
+            rl.add(somaMes[key] ?? 0.0);
+          }
+        } else if (periodoMeses == 9) {
+          final DateTime now = DateTime.now();
+          for (int m = 4; m <= 12; m++) {
+            final d = DateTime(now.year, m, 1);
             final key = fmtKey(d);
             ms.add(mesesPt[m - 1]);
             rl.add(somaMes[key] ?? 0.0);
@@ -449,7 +500,6 @@ class _VendasPageState extends State<VendasPage>
             melhorMesValor = rl.isEmpty ? 0 : rl.reduce((a, b) => a > b ? a : b);
           });
         }
-        // ------------------------------------------------
       }
 
       final deveAnimar = animarSeNecessario && !_jaAnimouUmaVezGlobal;
@@ -505,15 +555,50 @@ class _VendasPageState extends State<VendasPage>
       ..forward();
   }
 
+  Widget _buildMoedaKpi(
+    BuildContext context, {
+    required double valor,
+    required bool isBig,
+    required Color cor,
+    bool isMediaMensal = false,
+  }) {
+    final baseStyle = Theme.of(context).textTheme.titleMedium;
+    final double fontSize = isBig ? 18 : 16;
+
+    if (valor == 0) {
+      return Text(
+        _moedaFmt.format(0),
+        style: baseStyle?.copyWith(
+          fontSize: fontSize,
+          color: cor,
+          fontWeight: isMediaMensal ? FontWeight.w400 : FontWeight.w600,
+        ),
+      );
+    }
+
+    return DigitCurrency(
+      value: valor,
+      format: _moedaFmt,
+      animate: false,
+      rollBehavior: RollBehavior.noRoll,
+      textStyleBuilder: (context) => baseStyle?.copyWith(
+        fontSize: fontSize,
+        color: cor,
+        fontWeight: isMediaMensal ? FontWeight.w400 : FontWeight.w800,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
-    final headerTitle = isIndividual ? 'Dashboard do Consultor' : 'Dashboard de Vendas';
-    final String nomeVisivel = (consultorNome != null && consultorNome!.trim().isNotEmpty)
-        ? consultorNome!.trim()
-        : 'Consultor selecionado';
-
+    final headerTitle =
+        isIndividual ? 'Dashboard do Consultor' : 'Dashboard de Vendas';
+    final String nomeVisivel =
+        (consultorNome != null && consultorNome!.trim().isNotEmpty)
+            ? consultorNome!.trim()
+            : 'Consultor selecionado';
     final headerSubtitle = isIndividual ? 'Consultor: $nomeVisivel' : '';
     final chartSubtitle = isIndividual
         ? 'Somente vendas finalizadas - Consultor • $nomeVisivel'
@@ -569,7 +654,8 @@ class _VendasPageState extends State<VendasPage>
                                 borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: _voltarAoDashboard,
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
+                          icon:
+                              const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
                           label: const Text('Voltar ao Dashboard'),
                         ),
                       ),
@@ -605,18 +691,11 @@ class _VendasPageState extends State<VendasPage>
                         title: 'Total Vendas',
                         valueWidget: FittedBox(
                           alignment: Alignment.centerLeft,
-                          child: DigitCurrency(
-                            value: animTotal,
-                            format: _moedaFmt,
-                            animate: false,
-                            textStyleBuilder: (context) => Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                          child: _buildMoedaKpi(
+                            context,
+                            valor: animTotal,
+                            isBig: true,
+                            cor: Colors.white,
                           ),
                         ),
                         icon: Icons.attach_money_rounded,
@@ -633,18 +712,12 @@ class _VendasPageState extends State<VendasPage>
                         title: 'Média Mensal',
                         valueWidget: FittedBox(
                           alignment: Alignment.centerLeft,
-                          child: DigitCurrency(
-                            value: animMedia,
-                            format: _moedaFmt,
-                            animate: false,
-                            textStyleBuilder: (context) => Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontSize: 16,
-                                  color: const Color(0xFF222222),
-                                  fontWeight: FontWeight.w800,
-                                ),
+                          child: _buildMoedaKpi(
+                            context,
+                            valor: animMedia,
+                            isBig: true,
+                            cor: const Color(0xFF222222),
+                            isMediaMensal: true,
                           ),
                         ),
                         icon: Icons.track_changes_rounded,
@@ -656,18 +729,11 @@ class _VendasPageState extends State<VendasPage>
                         title: 'Melhor Mês',
                         valueWidget: FittedBox(
                           alignment: Alignment.centerLeft,
-                          child: DigitCurrency(
-                            value: animMelhor,
-                            format: _moedaFmt,
-                            animate: false,
-                            textStyleBuilder: (context) => Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontSize: 16,
-                                  color: const Color(0xFF222222),
-                                  fontWeight: FontWeight.w800,
-                                ),
+                          child: _buildMoedaKpi(
+                            context,
+                            valor: animMelhor,
+                            isBig: false,
+                            cor: const Color(0xFF222222),
                           ),
                         ),
                         icon: Icons.emoji_events_outlined,
@@ -746,10 +812,12 @@ class _HeaderRow extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight),
             boxShadow: const [
-              BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))
+              BoxShadow(
+                  color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))
             ],
           ),
-          child: const Icon(Icons.trending_up_rounded, color: Colors.white, size: 22),
+          child:
+              const Icon(Icons.trending_up_rounded, color: Colors.white, size: 22),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -781,8 +849,8 @@ class _HeaderRow extends StatelessWidget {
                         consultorText,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium
-                            ?.copyWith(color: Colors.black54, fontWeight: FontWeight.w600),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.black54, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -851,7 +919,8 @@ class _KpiLayoutFixed extends StatelessWidget {
         Positioned(
             top: _iconTop,
             left: _iconLeft,
-            child: SizedBox(height: 24, width: 24, child: FittedBox(child: icon))),
+            child:
+                SizedBox(height: 24, width: 24, child: FittedBox(child: icon))),
         Positioned(
           top: _titleTop,
           left: _side,
@@ -976,7 +1045,8 @@ class _KpiPeriodCard extends StatelessWidget {
                   height: 24,
                   width: 24,
                   child: FittedBox(
-                      child: Icon(icon, color: const Color(0xFFDD3A3A), size: 26))),
+                      child:
+                          Icon(icon, color: const Color(0xFFDD3A3A), size: 26))),
             ),
             Positioned(
               top: _titleTop,
@@ -1071,7 +1141,6 @@ class _BarrasVendasChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // trabalha em MILHÕES
     final barGroups = List.generate(meses.length, (i) {
       return BarChartGroupData(
         x: i,
@@ -1170,7 +1239,8 @@ class _BarrasVendasChart extends StatelessWidget {
             ),
           ),
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         barGroups: barGroups,
       ),
@@ -1180,13 +1250,12 @@ class _BarrasVendasChart extends StatelessWidget {
   }
 }
 
-// helper para os steps do eixo Y em milhões
 double _escolherStep(double maxY) {
-  if (maxY <= 2) return 0.5;   // 0, 0.5M, 1M, 1.5M, 2M
-  if (maxY <= 5) return 1;     // 0,1,2,3,4,5M
-  if (maxY <= 20) return 5;    // 0,5,10,15,20M
-  if (maxY <= 50) return 10;   // 0,10,20,30,40,50M
-  return 20;                   // 0,20,40,60,...
+  if (maxY <= 2) return 0.5;
+  if (maxY <= 5) return 1;
+  if (maxY <= 20) return 5;
+  if (maxY <= 50) return 10;
+  return 20;
 }
 
 enum RollBehavior { noRoll, rollOnce }
@@ -1211,7 +1280,8 @@ class DigitRoller extends StatefulWidget {
   State<DigitRoller> createState() => _DigitRollerState();
 }
 
-class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStateMixin {
+class _DigitRollerState extends State<DigitRoller>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
   String _lastRendered = '';
@@ -1272,7 +1342,8 @@ class _DigitRollerState extends State<DigitRoller> with SingleTickerProviderStat
             final digit = int.tryParse(ch) ?? 0;
             final loops = 1;
             final progress = _anim.value;
-            final value = ((progress * (10 * loops + digit)) % 10).round() % 10;
+            final value =
+                ((progress * (10 * loops + digit)) % 10).round() % 10;
             return SizedBox(
               height: style.fontSize != null ? style.fontSize! * 1.2 : null,
               child: Text(value.toString(), style: style),
@@ -1304,9 +1375,6 @@ class DigitCurrency extends StatelessWidget {
   Widget build(BuildContext context) {
     final txt = format.format(value);
     final style = textStyleBuilder(context);
-    if (!animate) {
-      // sem animação extra aqui, usando apenas DigitRoller se habilitado
-    }
     final parts = txt.characters.toList();
     return Wrap(
       children: parts.map((ch) {

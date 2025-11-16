@@ -24,7 +24,7 @@ class EditarPeriodoSheet extends StatelessWidget {
       return Expanded(
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => onSelecionar(m),
+          onTap: () => onSelecionar(m),  
           child: Container(
             height: 108,
             decoration: BoxDecoration(
