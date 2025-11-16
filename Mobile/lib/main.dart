@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'telas/login.dart';
 import 'telas/gestor/home_gestor.dart';
@@ -24,6 +25,43 @@ Future<void> loadEnv() async {
     debugPrint('✅ .env carregado com sucesso');
   } catch (e) {
     debugPrint('❌ Falha ao carregar .env: $e');
+  }
+}
+
+enum UserType { gestor, consultor }
+
+class UserTypeCache {
+  static const _keyType = 'user_type';
+  static const _keyName = 'user_name';
+
+  static Future<void> save(UserType type, String? name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyType, type.name);
+    if (name != null && name.isNotEmpty) {
+      await prefs.setString(_keyName, name);
+    }
+  }
+
+  static Future<UserType?> loadType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_keyType);
+    if (value == null) return null;
+    try {
+      return UserType.values.firstWhere((e) => e.name == value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> loadName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyName);
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyType);
+    await prefs.remove(_keyName);
   }
 }
 
@@ -95,7 +133,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     _authSub =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
       final session = data.session;
       debugPrint('🔐 Auth event: $event');
@@ -105,6 +143,7 @@ class _MyAppState extends State<MyApp> {
       }
 
       if (event == AuthChangeEvent.signedOut) {
+        await UserTypeCache.clear();
         navigatorKey.currentState?.pushNamedAndRemoveUntil(
           '/login',
           (route) => false,
@@ -157,65 +196,56 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Carregando...'),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final session = Supabase.instance.client.auth.currentSession;
-        if (session == null) {
-          return const LoginPage();
-        }
-
-        return const UserTypeRedirector();
-      },
-    );
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      return const LoginPage();
+    }
+    return const UserTypeRedirector();
   }
 }
 
 class UserTypeRedirector extends StatelessWidget {
   const UserTypeRedirector({super.key});
 
-  @override
-  Widget build(BuildContext context) {
+  Future<(UserType?, String?)> _resolveUserTypeAndName() async {
     final client = Supabase.instance.client;
     final userId = client.auth.currentSession?.user.id;
-    if (userId == null) {
-      return const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.warning, color: Colors.orange, size: 60),
-              SizedBox(height: 16),
-              Text('Sessão inválida', style: TextStyle(fontSize: 18)),
-              SizedBox(height: 8),
-              Text('Faça login novamente'),
-            ],
-          ),
-        ),
-      );
-    }
+    if (userId == null) return (null, null);
 
-    return FutureBuilder(
-      future: client
+    try {
+      final gestor = await client
           .from('gestor')
-          .select('id')
+          .select('id, nome') 
           .eq('id', userId)
-          .maybeSingle(),
+          .maybeSingle();
+
+      if (gestor != null) {
+        final nomeGestor = gestor['nome'] as String?;
+        await UserTypeCache.save(UserType.gestor, nomeGestor);
+        return (UserType.gestor, nomeGestor);
+      }
+
+      final consultor = await client
+          .from('consultor') 
+          .select('id, nome') 
+          .eq('id', userId)
+          .maybeSingle();
+
+      final nomeConsultor = consultor?['nome'] as String?;
+      await UserTypeCache.save(UserType.consultor, nomeConsultor);
+      return (UserType.consultor, nomeConsultor);
+    } catch (e) {
+      debugPrint('⚠️ Erro ao buscar tipo/nome (usando cache): $e');
+      final type = await UserTypeCache.loadType();
+      final name = await UserTypeCache.loadName();
+      return (type, name);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<(UserType?, String?)>(
+      future: _resolveUserTypeAndName(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -232,25 +262,14 @@ class UserTypeRedirector extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasError) {
-          debugPrint('❌ Erro ao carregar tipo: ${snapshot.error}');
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.cloud_off, color: Colors.red, size: 60),
-                  SizedBox(height: 16),
-                  Text('Erro de conexão', style: TextStyle(fontSize: 18)),
-                  SizedBox(height: 8),
-                  Text('Verifique sua internet'),
-                ],
-              ),
-            ),
-          );
-        }
+        final data = snapshot.data;
+        final type = data?.$1;
+        final name = data?.$2;
 
-        return snapshot.hasData && snapshot.data != null
+        if (type == null) {
+          return const LoginPage();
+        }
+        return type == UserType.gestor
             ? const HomeGestor()
             : const HomeConsultor();
       },
