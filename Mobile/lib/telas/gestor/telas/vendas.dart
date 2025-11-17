@@ -558,33 +558,22 @@ class _VendasPageState extends State<VendasPage>
   Widget _buildMoedaKpi(
     BuildContext context, {
     required double valor,
-    required bool isBig,
     required Color cor,
-    bool isMediaMensal = false,
   }) {
     final baseStyle = Theme.of(context).textTheme.titleMedium;
-    final double fontSize = isBig ? 18 : 16;
-
-    if (valor == 0) {
-      return Text(
-        _moedaFmt.format(0),
-        style: baseStyle?.copyWith(
-          fontSize: fontSize,
-          color: cor,
-          fontWeight: isMediaMensal ? FontWeight.w400 : FontWeight.w600,
-        ),
-      );
-    }
+    const double fontSize = 18;
 
     return DigitCurrency(
       value: valor,
       format: _moedaFmt,
-      animate: false,
-      rollBehavior: RollBehavior.noRoll,
+      animate: true,
+      rollBehavior: !_jaAnimouUmaVezGlobal
+          ? RollBehavior.rollOnce
+          : RollBehavior.noRoll,
       textStyleBuilder: (context) => baseStyle?.copyWith(
         fontSize: fontSize,
         color: cor,
-        fontWeight: isMediaMensal ? FontWeight.w400 : FontWeight.w800,
+        fontWeight: FontWeight.w800, 
       ),
     );
   }
@@ -694,7 +683,6 @@ class _VendasPageState extends State<VendasPage>
                           child: _buildMoedaKpi(
                             context,
                             valor: animTotal,
-                            isBig: true,
                             cor: Colors.white,
                           ),
                         ),
@@ -715,9 +703,7 @@ class _VendasPageState extends State<VendasPage>
                           child: _buildMoedaKpi(
                             context,
                             valor: animMedia,
-                            isBig: true,
                             cor: const Color(0xFF222222),
-                            isMediaMensal: true,
                           ),
                         ),
                         icon: Icons.track_changes_rounded,
@@ -732,7 +718,6 @@ class _VendasPageState extends State<VendasPage>
                           child: _buildMoedaKpi(
                             context,
                             valor: animMelhor,
-                            isBig: false,
                             cor: const Color(0xFF222222),
                           ),
                         ),
@@ -1188,8 +1173,7 @@ class _BarrasVendasChart extends StatelessWidget {
               getTitlesWidget: (value, meta) {
                 if (value < 0) return const SizedBox.shrink();
 
-                final double rounded =
-                    (value / step).roundToDouble() * step;
+                final double rounded = (value / step).roundToDouble() * step;
                 if ((value - rounded).abs() > 0.0001) {
                   return const SizedBox.shrink();
                 }
@@ -1376,9 +1360,15 @@ class DigitCurrency extends StatelessWidget {
     final txt = format.format(value);
     final style = textStyleBuilder(context);
     final parts = txt.characters.toList();
+
+    if (!animate) {
+      return Text(txt, style: style);
+    }
+
     return Wrap(
       children: parts.map((ch) {
-        if (RegExp(r'[0-9]').hasMatch(ch) && rollBehavior != RollBehavior.noRoll) {
+        if (RegExp(r'[0-9]').hasMatch(ch) &&
+            rollBehavior != RollBehavior.noRoll) {
           return DigitRoller(
             text: ch,
             style: style,
