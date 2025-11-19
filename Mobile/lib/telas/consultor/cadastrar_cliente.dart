@@ -147,10 +147,13 @@ class CadastrarClienteState extends State<CadastrarCliente> {
   final cepCtrl = TextEditingController();
   String? statusNegociacao;
   final valorPropostaCtrl = TextEditingController();
+
   final dataNegociacaoCtrl = TextEditingController();
   final horaNegociacaoCtrl = TextEditingController();
+
   final dataVisitaCtrl = TextEditingController();
   final horaVisitaCtrl = TextEditingController();
+
   final observacoesCtrl = TextEditingController();
 
   final telefoneFormatter = MaskTextInputFormatter(
@@ -212,10 +215,11 @@ class CadastrarClienteState extends State<CadastrarCliente> {
       bearerToken: kCorreiosBearerToken,
     );
 
-    dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
-    horaVisitaCtrl.text = DateFormat('HH:mm').format(DateTime.now());
     dataNegociacaoCtrl.clear();
     horaNegociacaoCtrl.clear();
+
+    dataVisitaCtrl.clear();
+    horaVisitaCtrl.clear();
 
     cepListener = () {
       final raw = cepCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -242,6 +246,7 @@ class CadastrarClienteState extends State<CadastrarCliente> {
     numeroCtrl.dispose();
     cepCtrl.dispose();
     valorPropostaCtrl.dispose();
+
     dataNegociacaoCtrl.dispose();
     horaNegociacaoCtrl.dispose();
     dataVisitaCtrl.dispose();
@@ -251,9 +256,8 @@ class CadastrarClienteState extends State<CadastrarCliente> {
     super.dispose();
   }
 
-  Future<void> selecionarDataVisita() async {
+  Future<void> selecionarDataNegociacao() async {
     final now = DateTime.now();
-
     final picked = await showDatePicker(
       context: context,
       initialDate: now,
@@ -280,12 +284,12 @@ class CadastrarClienteState extends State<CadastrarCliente> {
 
     if (picked != null) {
       setState(() {
-        dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
+        dataNegociacaoCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
       });
     }
   }
 
-  Future<void> selecionarHoraVisita() async {
+  Future<void> selecionarHoraNegociacao() async {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -310,7 +314,7 @@ class CadastrarClienteState extends State<CadastrarCliente> {
 
     if (picked != null) {
       setState(() {
-        horaVisitaCtrl.text = picked.format(context);
+        horaNegociacaoCtrl.text = picked.format(context);
       });
     }
   }
@@ -438,7 +442,6 @@ class CadastrarClienteState extends State<CadastrarCliente> {
         }
       });
     } catch (_) {
-      // silencioso
     }
   }
 
@@ -450,36 +453,44 @@ class CadastrarClienteState extends State<CadastrarCliente> {
     }
 
     try {
-      final dataVisitaStr = dataVisitaCtrl.text.trim();
-      final horaVisitaStr = horaVisitaCtrl.text.trim();
+      final dataNegStr = dataNegociacaoCtrl.text.trim();
+      final horaNegStr = horaNegociacaoCtrl.text.trim();
 
-      if (dataVisitaStr.isEmpty || horaVisitaStr.isEmpty) {
+      if (dataNegStr.isEmpty || horaNegStr.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Data e hora da visita são obrigatórias'),
+            content: Text('Data e hora da negociação (próxima visita) são obrigatórias'),
           ),
         );
         return;
       }
 
-      late DateTime dataHoraVisita;
+      late DateTime dataHoraNegociacao;
       try {
-        final horaParsed = DateFormat('HH:mm').parse(horaVisitaStr);
+        final horaParsed = DateFormat('HH:mm').parse(horaNegStr);
         final horaPadrao = DateFormat('HH:mm').format(horaParsed);
-        dataHoraVisita =
-            DateFormat('dd/MM/yyyy HH:mm').parse('$dataVisitaStr $horaPadrao');
+
+        dataHoraNegociacao =
+            DateFormat('dd/MM/yyyy HH:mm').parse('$dataNegStr $horaPadrao');
       } on FormatException {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Data ou hora da visita inválida. Use o formato correto.',
+              'Data ou hora da negociação inválida. Use o formato correto.',
             ),
           ),
         );
         return;
       }
+
+      final agora = DateTime.now();
+      final dataVisitaAtual = DateFormat('dd/MM/yyyy').format(agora);
+      final horaVisitaAtual = DateFormat('HH:mm').format(agora);
+
+      dataVisitaCtrl.text = dataVisitaAtual;
+      horaVisitaCtrl.text = horaVisitaAtual;
 
       final session = client.auth.currentSession;
       if (session == null || session.user == null) {
@@ -512,10 +523,6 @@ class CadastrarClienteState extends State<CadastrarCliente> {
         valorProposta = num.tryParse(normValor);
       }
 
-      final agora = DateTime.now();
-      final dataNegociacaoAtual = DateFormat('dd/MM/yyyy').format(agora);
-      final horaNegociacaoAtual = DateFormat('HH:mm').format(agora);
-
       final telefoneDigits =
           telefoneCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
       final cepDigits = cepCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -536,15 +543,20 @@ class CadastrarClienteState extends State<CadastrarCliente> {
             : null,
         bairro: norm(bairroCtrl.text),
         cep: cepDigits,
-        dataVisita: dataHoraVisita,
+
+        dataVisita: agora,
+        horaVisita: horaVisitaAtual,
+
         observacoes: observacoesCtrl.text.trim().isNotEmpty
             ? norm(observacoesCtrl.text)
             : null,
         consultorResponsavel: consultorNomeLocal,
         consultorUid: userId,
-        horaVisita: horaVisitaStr,
         statusNegociacao: statusNegociacao,
         valorProposta: valorProposta,
+
+        dataNegociacao: dataHoraNegociacao,
+        horaNegociacao: horaNegStr,
       );
 
       final persistedNow =
@@ -555,8 +567,10 @@ class CadastrarClienteState extends State<CadastrarCliente> {
       if (persistedNow) {
         try {
           await client.from('clientes').update({
-            'datanegociacao': dataNegociacaoAtual,
-            'horanegociacao': horaNegociacaoAtual,
+            'data_negociacao': dataHoraNegociacao.toIso8601String(),
+            'hora_negociacao': DateFormat('HH:mm:ss').format(dataHoraNegociacao),
+            'data_visita': agora.toIso8601String(),
+            'hora_visita': DateFormat('HH:mm:ss').format(agora),
           }).eq('id', cliente.id);
 
           await NotificationService.showSuccessNotification();
@@ -568,7 +582,8 @@ class CadastrarClienteState extends State<CadastrarCliente> {
             SnackBar(
               content: Text(
                 'Cliente cadastrado com sucesso! '
-                'Data/hora da negociação: $dataNegociacaoAtual $horaNegociacaoAtual',
+                'Negociação (próx. visita): $dataNegStr $horaNegStr | '
+                'Visita realizada agora: $dataVisitaAtual $horaVisitaAtual',
               ),
               duration: const Duration(seconds: 4),
             ),
@@ -577,7 +592,7 @@ class CadastrarClienteState extends State<CadastrarCliente> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Cliente salvo, mas erro ao salvar data/hora da negociação: $e',
+                'Cliente salvo, mas erro ao salvar datas/horas: $e',
               ),
               backgroundColor: kDanger,
             ),
@@ -621,10 +636,8 @@ class CadastrarClienteState extends State<CadastrarCliente> {
 
     dataNegociacaoCtrl.clear();
     horaNegociacaoCtrl.clear();
-    dataVisitaCtrl.text =
-        DateFormat('dd/MM/yyyy').format(DateTime.now());
-    horaVisitaCtrl.text =
-        DateFormat('HH:mm').format(DateTime.now());
+    dataVisitaCtrl.clear();
+    horaVisitaCtrl.clear();
 
     FocusScope.of(context).unfocus();
     setState(() {});
@@ -1020,7 +1033,7 @@ class CadastrarClienteState extends State<CadastrarCliente> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Negociação',
+                              'Negociação / Próxima visita',
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
@@ -1098,6 +1111,71 @@ class CadastrarClienteState extends State<CadastrarCliente> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap:
+                                        selecionarDataNegociacao,
+                                    child: AbsorbPointer(
+                                      child: TextFormField(
+                                        controller:
+                                            dataNegociacaoCtrl,
+                                        readOnly: true,
+                                        decoration:
+                                            obterDecoracaoCampo(
+                                          'Data negociação (próx. visita)',
+                                          hint:
+                                              'dd/mm/aaaa',
+                                          prefixIcon: const Icon(
+                                              Icons
+                                                  .event_note_outlined),
+                                          suffixIcon:
+                                              IconButton(
+                                            icon: const Icon(
+                                                Icons
+                                                    .calendar_today_outlined),
+                                            onPressed:
+                                                selecionarDataNegociacao,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap:
+                                        selecionarHoraNegociacao,
+                                    child: AbsorbPointer(
+                                      child: TextFormField(
+                                        controller:
+                                            horaNegociacaoCtrl,
+                                        readOnly: true,
+                                        decoration:
+                                            obterDecoracaoCampo(
+                                          'Hora negociação',
+                                          hint: '00:00',
+                                          prefixIcon: const Icon(
+                                              Icons
+                                                  .access_time_outlined),
+                                          suffixIcon:
+                                              IconButton(
+                                            icon: const Icon(
+                                                Icons
+                                                    .access_time),
+                                            onPressed:
+                                                selecionarHoraNegociacao,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               'Observações',
@@ -1126,83 +1204,6 @@ class CadastrarClienteState extends State<CadastrarCliente> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              'Agendamento de Visita',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight:
-                                        FontWeight.bold,
-                                    color: kInk,
-                                  ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap:
-                                        selecionarDataVisita,
-                                    child: AbsorbPointer(
-                                      child: TextFormField(
-                                        controller:
-                                            dataVisitaCtrl,
-                                        readOnly: true,
-                                        decoration:
-                                            obterDecoracaoCampo(
-                                          'Data da visita',
-                                          hint:
-                                              'dd/mm/aaaa',
-                                          prefixIcon: const Icon(
-                                              Icons
-                                                  .event_available_outlined),
-                                          suffixIcon:
-                                              IconButton(
-                                            icon: const Icon(
-                                                Icons
-                                                    .calendar_today_outlined),
-                                            onPressed:
-                                                selecionarDataVisita,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap:
-                                        selecionarHoraVisita,
-                                    child: AbsorbPointer(
-                                      child: TextFormField(
-                                        controller:
-                                            horaVisitaCtrl,
-                                        readOnly: true,
-                                        decoration:
-                                            obterDecoracaoCampo(
-                                          'Hora da visita',
-                                          hint: '00:00',
-                                          prefixIcon: const Icon(
-                                              Icons
-                                                  .access_time_outlined),
-                                          suffixIcon:
-                                              IconButton(
-                                            icon: const Icon(
-                                                Icons
-                                                    .access_time),
-                                            onPressed:
-                                                selecionarHoraVisita,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
                             Container(
                               padding:
                                   const EdgeInsets.all(12),
@@ -1230,8 +1231,8 @@ class CadastrarClienteState extends State<CadastrarCliente> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Data da visita e hora da visita são definidas '
-                                      'automaticamente com a data e hora atuais no momento do cadastro.',
+                                      'A data_visita e a hora_visita serão definidas automaticamente '
+                                      'com a data e hora atuais do dispositivo no momento em que você salvar o cliente.',
                                       style: Theme.of(
                                               context)
                                           .textTheme
