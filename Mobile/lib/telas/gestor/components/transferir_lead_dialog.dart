@@ -55,6 +55,7 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
           .select('uid, nome')
           .eq('ativo', true)
           .order('nome');
+
       setState(() {
         _consultores = List<Map<String, dynamic>>.from(rows);
         _loading = false;
@@ -69,15 +70,18 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
 
   Future<void> _confirmar() async {
     if (!_formKey.currentState!.validate()) return;
+
     final uid = _selecionado;
     if (uid == null || uid.isEmpty) {
       setState(() => _erro = 'Selecione o consultor.');
       return;
     }
+
     setState(() {
       _erro = null;
       _sending = true;
     });
+
     try {
       await widget.onConfirmar(uid);
       if (mounted) Navigator.of(context).pop(true);
@@ -114,13 +118,21 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       alignment: Alignment.center,
-                      child: const Icon(Icons.sync_alt_rounded, color: vermelho, size: 16),
+                      child: const Icon(
+                        Icons.sync_alt_rounded,
+                        color: vermelho,
+                        size: 16,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Transferir Lead',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: texto),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: texto,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -132,16 +144,24 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                 ),
               ),
               const Divider(height: 1),
-
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 child: _loading
-                    ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
+                    ? const SizedBox(
+                        height: 120,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Lead Selecionado', style: TextStyle(fontSize: 12.5, color: Color(0xFF6B6B6E))),
+                          const Text(
+                            'Lead Selecionado',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: cinzaClaro,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           Container(
                             decoration: BoxDecoration(
@@ -149,29 +169,49 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: borda, width: 1),
                             ),
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            padding:
+                                const EdgeInsets.fromLTRB(12, 10, 12, 10),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   widget.lead.nome ?? '-',
-                                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: texto),
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: texto,
+                                  ),
                                 ),
                                 if ((widget.lead.telefone ?? '').isNotEmpty) ...[
                                   const SizedBox(height: 4),
-                                  Text(widget.lead.telefone!, style: const TextStyle(fontSize: 13.5, color: texto)),
+                                  Text(
+                                    widget.lead.telefone!,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      color: texto,
+                                    ),
+                                  ),
                                 ],
                                 const SizedBox(height: 4),
                                 Text(
                                   'Consultor atual: ${widget.consultorAtualNome}',
-                                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF6B6B6E)),
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: cinzaClaro,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 16),
-                          const Text('Transferir para',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: texto)),
+                          const Text(
+                            'Transferir para',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: texto,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           Form(
                             key: _formKey,
@@ -179,37 +219,57 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                               isExpanded: true,
                               value: _selecionado,
                               items: _consultores
-                                  .map((c) => DropdownMenuItem<String>(
-                                        value: c['uid'] as String,
-                                        child: Text(c['nome'] as String),
-                                      ))
+                                  .map(
+                                    (c) => DropdownMenuItem<String>(
+                                      value: c['uid'] as String,
+                                      child: Text(c['nome'] as String),
+                                    ),
+                                  )
                                   .toList(),
-                              onChanged: (v) => setState(() => _selecionado = v),
+                              onChanged: (v) =>
+                                  setState(() => _selecionado = v),
                               decoration: InputDecoration(
                                 hintText: 'Selecione o consultor',
                                 hintStyle: const TextStyle(color: cinza),
                                 isDense: true,
                                 contentPadding:
-                                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: borda, width: 1),
+                                  borderSide: const BorderSide(
+                                    color: borda,
+                                    width: 1,
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: borda, width: 1),
+                                  borderSide: const BorderSide(
+                                    color: borda,
+                                    width: 1,
+                                  ),
                                 ),
                                 focusedBorder: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(10)),
-                                  borderSide: BorderSide(color: vermelho, width: 1.2),
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(10)),
+                                  borderSide: BorderSide(
+                                    color: vermelho,
+                                    width: 1.2,
+                                  ),
                                 ),
                               ),
-                              validator: (v) => v == null ? 'Selecione um consultor' : null,
+                              validator: (v) =>
+                                  v == null ? 'Selecione um consultor' : null,
                             ),
                           ),
                           if (_erro != null) ...[
                             const SizedBox(height: 8),
-                            Text(_erro!, style: const TextStyle(color: Colors.red)),
+                            Text(
+                              _erro!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
                           ],
                           const SizedBox(height: 14),
                           SizedBox(
@@ -236,7 +296,9 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                                 ],
                               ),
                               child: ElevatedButton(
-                                onPressed: (_selecionado == null || _sending) ? null : _confirmar,
+                                onPressed: (_selecionado == null || _sending)
+                                    ? null
+                                    : _confirmar,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   disabledBackgroundColor: Colors.transparent,
@@ -250,15 +312,28 @@ class _TLTransferirLeadDialogState extends State<TLTransferirLeadDialog> {
                                     ? const SizedBox(
                                         width: 18,
                                         height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
                                       )
                                     : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: const [
-                                          Icon(Icons.sync_alt_rounded, size: 18, color: Colors.white),
+                                          Icon(
+                                            Icons.sync_alt_rounded,
+                                            size: 18,
+                                            color: Colors.white,
+                                          ),
                                           SizedBox(width: 8),
-                                          Text('Confirmar Transferência',
-                                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                                          Text(
+                                            'Confirmar Transferência',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                         ],
                                       ),
                               ),

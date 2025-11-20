@@ -34,8 +34,8 @@ class _HomeGestorState extends State<HomeGestor> {
   final List<Map<String, dynamic>> _leads = [];
   final Set<dynamic> _ids = {};
   int _page = 0;
-  final int _pageSize = 25;
-  bool _hasMore = true;
+  final int _pageSize = 100000; // carrega tudo de uma vez
+  bool _hasMore = false;
   bool _loadingMore = false;
   bool _expandirTodos = false;
 
@@ -252,12 +252,11 @@ class _HomeGestorState extends State<HomeGestor> {
         _leads.clear();
         _ids.clear();
         _page = 0;
-        _hasMore = true;
+        _hasMore = false;
         _loadingMore = false;
         _expandirTodos = false;
       });
     }
-    if (!_hasMore || _loadingMore) return;
 
     try {
       setState(() => _loadingMore = true);
@@ -273,16 +272,12 @@ class _HomeGestorState extends State<HomeGestor> {
         return;
       }
 
-      final start = _page * _pageSize;
-      final end = start + _pageSize - 1;
-
       final rows = await _sb
           .from('clientes')
           .select(
               'id, nome, telefone, logradouro, endereco, numero, bairro, cidade, estabelecimento, data_visita, observacoes, consultor_uid_t, status_negociacao')
           .inFilter('consultor_uid_t', consUids)
-          .order('data_visita', ascending: true)
-          .range(start, end);
+          .order('data_visita', ascending: true);
 
       final batch = <Map<String, dynamic>>[];
       for (final r in (rows as List)) {
@@ -339,19 +334,21 @@ class _HomeGestorState extends State<HomeGestor> {
 
       if (!mounted) return;
       setState(() {
-        _leads.addAll(batch);
+        _leads
+          ..clear()
+          ..addAll(batch);
 
         _leads.sort((a, b) {
           final da = (a['dias'] as int?) ?? -1;
           final db = (b['dias'] as int?) ?? -1;
           if (da == db) return 0;
-          if (da <= 0 && db > 0) return 1; 
+          if (da <= 0 && db > 0) return 1;
           if (db <= 0 && da > 0) return -1;
           return db.compareTo(da);
         });
 
-        _page += 1;
-        _hasMore = (rows as List).length == _pageSize;
+        _page = 0;
+        _hasMore = false;
         _loading = false;
         _loadingMore = false;
       });
@@ -396,7 +393,7 @@ class _HomeGestorState extends State<HomeGestor> {
 
   @override
   Widget build(BuildContext context) {
-    final totalGeral = _ids.length;
+    final totalGeral = _leads.length;
     final totalFiltro = _leadsFiltrados.length;
 
     return Theme(
@@ -603,15 +600,6 @@ class _HomeGestorState extends State<HomeGestor> {
 
   Future<void> _abrirTransferir(Map<String, dynamic> c) async {
     final dias = (c['dias'] as int?) ?? -1;
-
-    if (dias >= 0 && dias < 90) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Só é possível transferir leads com 90 dias ou mais.'),
-        ),
-      );
-      return;
-    }
 
     final ok = await showDialog<bool>(
       context: context,
