@@ -42,6 +42,7 @@ class GestorHeaderRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              // TOTAL
               _ChipBox(
                 backgroundColor: vermelhoClaro,
                 borderColor: cinzaClaro,
@@ -56,7 +57,7 @@ class GestorHeaderRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
 
-              // AVISOS – mesmo tamanho/base do TOTAL
+              // AVISOS – mesmo tamanho/base do TOTAL, com badge
               GestureDetector(
                 onTap: onAvisos,
                 child: _ChipBox(

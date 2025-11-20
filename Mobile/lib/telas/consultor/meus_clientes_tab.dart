@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
-const Color primaryRed = Color(0xFFFF0000); 
+const Color primaryRed = Color(0xFFFF0000);
 
 class MeusClientesTab extends StatefulWidget {
   final Function onClienteRemovido;
@@ -21,6 +21,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
   bool _showSearch = false;
   Timer? _debounceSearch;
 
+  bool _mostrarTodos = false;
+
   final Map<String, String> _abbr = const {
     'Avenida': 'Av.',
     'Rua': 'R.',
@@ -33,7 +35,15 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     'Via': 'Via',
   };
   final List<String> _tiposLogradouro = const [
-    'Rua','Avenida','Alameda','Travessa','Rodovia','Estrada','Praça','Via','Largo'
+    'Rua',
+    'Avenida',
+    'Alameda',
+    'Travessa',
+    'Rodovia',
+    'Estrada',
+    'Praça',
+    'Via',
+    'Largo'
   ];
   final List<Map<String, String>> _statusOptions = const [
     {'label': 'Conexão', 'value': 'conexao'},
@@ -48,7 +58,10 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       _debounceSearch?.cancel();
       _debounceSearch = Timer(const Duration(milliseconds: 500), () {
         if (!mounted) return;
-        setState(() { _query = _searchCtrl.text.trim(); });
+        setState(() {
+          _query = _searchCtrl.text.trim();
+          _mostrarTodos = _query.isNotEmpty; 
+        });
       });
     });
   }
@@ -64,20 +77,23 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     final user = _client.auth.currentSession?.user;
     if (user == null) return const Stream<List<Map<String, dynamic>>>.empty();
     return _client
-      .from('clientes')
-      .select('*')
-      .eq('consultor_uid_t', user.id)
-      .order('data_negociacao', ascending: true, nullsFirst: false)
-      .asStream();
+        .from('clientes')
+        .select('*')
+        .eq('consultor_uid_t', user.id)
+        .order('data_negociacao', ascending: true, nullsFirst: false)
+        .asStream();
   }
 
-  InputDecoration _decoracaoCampo(BuildContext context, String label, {String? hint, Widget? suffixIcon}) {
+  InputDecoration _decoracaoCampo(BuildContext context, String label,
+      {String? hint, Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      fillColor:
+          Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       suffixIcon: suffixIcon,
       isDense: true,
@@ -86,28 +102,40 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
   String _statusLabel(String? v) {
     switch ((v ?? '').toLowerCase()) {
-      case 'conexao': return 'Conexão';
-      case 'negociacao': return 'Negociação';
-      case 'fechada': return 'Fechada';
-      default: return '—';
+      case 'conexao':
+        return 'Conexão';
+      case 'negociacao':
+        return 'Negociação';
+      case 'fechada':
+        return 'Fechada';
+      default:
+        return '—';
     }
   }
 
   Color _statusColor(String? v) {
     switch ((v ?? '').toLowerCase()) {
-      case 'conexao': return Colors.blue;
-      case 'negociacao': return Colors.orange;
-      case 'fechada': return Colors.red; 
-      default: return Colors.grey;
+      case 'conexao':
+        return Colors.blue;
+      case 'negociacao':
+        return Colors.orange;
+      case 'fechada':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
   int _pesoStatus(String? s) {
     switch ((s ?? '').toLowerCase()) {
-      case 'conexao': return 0;
-      case 'negociacao': return 1;
-      case 'fechada': return 2;
-      default: return 3;
+      case 'conexao':
+        return 0;
+      case 'negociacao':
+        return 1;
+      case 'fechada':
+        return 2;
+      default:
+        return 3;
     }
   }
 
@@ -116,8 +144,10 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     final pb = _pesoStatus(b['status_negociacao']?.toString());
     if (pa != pb) return pa.compareTo(pb);
 
-    final DateTime? da = _joinDataHora(a['data_negociacao'], a['hora_negociacao']);
-    final DateTime? db = _joinDataHora(b['data_negociacao'], b['hora_negociacao']);
+    final DateTime? da =
+        _joinDataHora(a['data_negociacao'], a['hora_negociacao']);
+    final DateTime? db =
+        _joinDataHora(b['data_negociacao'], b['hora_negociacao']);
     if (da != null && db != null) {
       final cmp = da.compareTo(db);
       if (cmp != 0) return cmp;
@@ -127,14 +157,19 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       return -1;
     }
 
-    final sa = (a['estabelecimento'] ?? a['nome'] ?? '').toString().toLowerCase();
-    final sb = (b['estabelecimento'] ?? b['nome'] ?? '').toString().toLowerCase();
+    final sa = (a['estabelecimento'] ?? a['nome'] ?? '')
+        .toString()
+        .toLowerCase();
+    final sb = (b['estabelecimento'] ?? b['nome'] ?? '')
+        .toString()
+        .toLowerCase();
     return sa.compareTo(sb);
   }
 
   DateTime? _joinDataHora(dynamic data, dynamic hora) {
     if (data == null || (data is String && data.isEmpty)) return null;
-    final dataDate = data is DateTime ? data : DateTime.tryParse(data.toString());
+    final dataDate =
+        data is DateTime ? data : DateTime.tryParse(data.toString());
     if (dataDate == null) return null;
     int hour = 0, minute = 0;
     if (hora != null && hora is String && hora.contains(':')) {
@@ -157,6 +192,7 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
           if (_showSearch) setState(() => _showSearch = false);
         },
         child: CustomScrollView(
+          key: const PageStorageKey('meus_clientes_scroll'),
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(
@@ -168,7 +204,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                   decoration: _decoracaoCampo(
                     context,
                     'Buscar clientes',
-                    hint: 'Digite nome, endereço, bairro, cidade ou status...',
+                    hint:
+                        'Digite nome, endereço, bairro, cidade ou status...',
                     suffixIcon: _query.isEmpty
                         ? const Icon(Icons.search)
                         : IconButton(
@@ -179,15 +216,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                               setState(() {
                                 _query = '';
                                 _showSearch = false;
+                                _mostrarTodos = false;
                               });
                               FocusScope.of(context).unfocus();
                             },
                             tooltip: 'Limpar',
                           ),
                   ),
-                  onTap: () => setState(() => _showSearch = true), 
+                  onTap: () => setState(() => _showSearch = true),
                   onSubmitted: (_) {
-                    setState(() => _showSearch = false); 
+                    setState(() => _showSearch = false);
                     FocusScope.of(context).unfocus();
                   },
                 ),
@@ -197,13 +235,25 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
               stream: _meusClientesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
+                  return const SliverToBoxAdapter(
+                    child: Center(child: CircularProgressIndicator()),
+                  );
                 }
                 if (snapshot.hasError) {
-                  return SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16), child: Text('Erro: ${snapshot.error}')));
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Erro: ${snapshot.error}'),
+                    ),
+                  );
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16), child: _buildEmptyState()));
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _buildEmptyState(),
+                    ),
+                  );
                 }
 
                 final clientes = snapshot.data!;
@@ -213,9 +263,13 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                 if (_query.isEmpty) {
                   clientesFiltrados = [...clientes];
                 } else {
-                  String s(Object? x) => (x ?? '').toString().toLowerCase();
+                  String s(Object? x) =>
+                      (x ?? '').toString().toLowerCase();
                   clientesFiltrados = clientes.where((c) {
-                    final estabelecimento = s(c['estabelecimento'].toString().isNotEmpty ? c['estabelecimento'] : c['nome']);
+                    final estabelecimento = s(
+                        c['estabelecimento'].toString().isNotEmpty
+                            ? c['estabelecimento']
+                            : c['nome']);
                     final logradouro = s(c['logradouro']);
                     final endereco = s(c['endereco']);
                     final numero = s(c['numero']);
@@ -224,12 +278,12 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                     final status = s(c['status_negociacao']);
                     final valor = s(c['valor_proposta']);
                     return estabelecimento.contains(q) ||
-                           (logradouro + ' ' + endereco).contains(q) ||
-                           numero.contains(q) ||
-                           bairro.contains(q) ||
-                           cidade.contains(q) ||
-                           status.contains(q) ||
-                           valor.contains(q);
+                        (logradouro + ' ' + endereco).contains(q) ||
+                        numero.contains(q) ||
+                        bairro.contains(q) ||
+                        cidade.contains(q) ||
+                        status.contains(q) ||
+                        valor.contains(q);
                   }).toList();
                 }
 
@@ -241,19 +295,40 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          Icon(Icons.search_off_outlined, size: 48, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                          Icon(Icons.search_off_outlined,
+                              size: 48,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.4)),
                           const SizedBox(height: 16),
-                          Text('Nenhum cliente encontrado', style: Theme.of(context).textTheme.bodyLarge),
+                          Text('Nenhum cliente encontrado',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge),
                         ],
                       ),
                     ),
                   );
                 }
 
+                final total = clientesFiltrados.length;
+                final bool mostrarLimite =
+                    !_mostrarTodos && _query.isEmpty && total > 10;
+                final int itemCount =
+                    mostrarLimite ? 11 : clientesFiltrados.length;
+
                 return SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildClienteItem(clientesFiltrados[index]),
-                    childCount: clientesFiltrados.length,
+                    (context, index) {
+                      if (mostrarLimite && index == 10) {
+                        final restantes = total - 10;
+                        return _buildVerMaisCard(restantes);
+                      }
+                      final c = clientesFiltrados[index];
+                      return _buildClienteItem(c);
+                    },
+                    childCount: itemCount,
                   ),
                 );
               },
@@ -277,20 +352,33 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
               color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.people_outline_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer, size: 28),
+            child: Icon(Icons.people_outline_rounded,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Meus Clientes',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      )),
-              const SizedBox(height: 4),
-              Text('Gerencie sua lista de clientes',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Meus Clientes',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  Theme.of(context).colorScheme.onSurface)),
+                  const SizedBox(height: 4),
+                  Text('Gerencie sua lista de clientes',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
+                ]),
           ),
         ],
       ),
@@ -302,25 +390,74 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
         children: [
-          Icon(Icons.people_outline_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+          Icon(Icons.people_outline_rounded,
+              size: 64,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withOpacity(0.4)),
           const SizedBox(height: 16),
-          Text('Nenhum cliente cadastrado', style: Theme.of(context).textTheme.bodyLarge),
+          Text('Nenhum cliente cadastrado',
+              style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 8),
           Text('Cadastre seus primeiros clientes',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.6))),
         ],
       ),
     );
   }
 
+  Widget _buildVerMaisCard(int restantes) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFDFDFDF), width: 1),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _mostrarTodos = true),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    restantes > 1
+                        ? 'Ver mais $restantes clientes'
+                        : 'Ver mais 1 cliente',
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF231F20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildClienteItem(Map<String, dynamic> c) {
-    final String titulo = (c['estabelecimento'] ?? c['nome'] ?? 'Cliente').toString().trim();
+    final String titulo =
+        (c['estabelecimento'] ?? c['nome'] ?? 'Cliente').toString().trim();
 
     final String tipoAbrev = (c['logradouro'] ?? '').toString().trim();
     final String nomeVia = (c['endereco'] ?? '').toString().trim();
     final String numero = (c['numero'] ?? '').toString().trim();
-    final String complemento = (c['complemento'] ?? '').toString().trim();
+    final String complemento =
+        (c['complemento'] ?? '').toString().trim();
     final String bairro = (c['bairro'] ?? '').toString().trim();
 
     final String linhaEndereco = [
@@ -332,18 +469,25 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     ].join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 
     final String cidade = (c['cidade'] ?? '').toString().trim();
-    final String estado = (c['estado'] ?? '').toString().trim().toUpperCase();
-    final String linhaCidade = [cidade, estado].where((e) => e.isNotEmpty).join(' - ');
+    final String estado =
+        (c['estado'] ?? '').toString().trim().toUpperCase();
+    final String linhaCidade =
+        [cidade, estado].where((e) => e.isNotEmpty).join(' - ');
 
-    final DateTime? dataHoraVisita = _joinDataHora(c['data_negociacao'], c['hora_negociacao']);
+    final DateTime? dataHoraNeg =
+        _joinDataHora(c['data_negociacao'], c['hora_negociacao']);
     final now = DateTime.now();
-    final bool visitaHoje = dataHoraVisita != null &&
-        dataHoraVisita.year == now.year && dataHoraVisita.month == now.month && dataHoraVisita.day == now.day;
-    final bool visitaPassada = dataHoraVisita != null && dataHoraVisita.isBefore(DateTime(now.year, now.month, now.day));
+    final bool hoje = dataHoraNeg != null &&
+        dataHoraNeg.year == now.year &&
+        dataHoraNeg.month == now.month &&
+        dataHoraNeg.day == now.day;
+    final bool passada = dataHoraNeg != null &&
+        dataHoraNeg.isBefore(DateTime(now.year, now.month, now.day));
 
     String dataFormatada = 'Data não informada';
-    if (dataHoraVisita != null) {
-      dataFormatada = 'Visita: ${DateFormat('dd/MM/yyyy HH:mm').format(dataHoraVisita)}';
+    if (dataHoraNeg != null) {
+      dataFormatada =
+          'Negociação: ${DateFormat('dd/MM/yyyy HH:mm').format(dataHoraNeg)}';
     }
 
     final String statusTec = (c['status_negociacao'] ?? '').toString();
@@ -353,7 +497,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
         ? c['valor_proposta'] as num
         : num.tryParse((c['valor_proposta'] ?? '').toString());
     final String valorFmt = valorProposta != null
-        ? NumberFormat.simpleCurrency(locale: 'pt_BR').format(valorProposta)
+        ? NumberFormat.simpleCurrency(locale: 'pt_BR')
+            .format(valorProposta)
         : '—';
 
     return Card(
@@ -369,16 +514,24 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: visitaPassada
+                  color: passada
                       ? Colors.grey.shade200
-                      : visitaHoje
+                      : hoje
                           ? Colors.red.shade50
                           : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  visitaPassada ? Icons.check_circle : visitaHoje ? Icons.flag : Icons.schedule,
-                  color: visitaPassada ? Colors.grey : visitaHoje ? Colors.red : Colors.blue,
+                  passada
+                      ? Icons.check_circle
+                      : hoje
+                          ? Icons.flag
+                          : Icons.schedule,
+                  color: passada
+                      ? Colors.grey
+                      : hoje
+                          ? Colors.red
+                          : Colors.blue,
                   size: 20,
                 ),
               ),
@@ -387,12 +540,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    Text(titulo,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
                     const SizedBox(height: 4),
                     if (linhaEndereco.isNotEmpty)
-                      Text(linhaEndereco, style: Theme.of(context).textTheme.bodySmall),
+                      Text(linhaEndereco,
+                          style: Theme.of(context).textTheme.bodySmall),
                     if (linhaCidade.isNotEmpty)
-                      Text(linhaCidade, style: Theme.of(context).textTheme.bodySmall),
+                      Text(linhaCidade,
+                          style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 12,
@@ -402,11 +559,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                         Chip(
                           label: Text(statusLabel),
                           backgroundColor: statusColor.withOpacity(0.1),
-                          labelStyle: TextStyle(color: statusColor, fontWeight: FontWeight.w600),
+                          labelStyle: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.w600),
                         ),
                         Text(
                           'Proposta: $valorFmt',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -415,11 +577,11 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                       dataFormatada,
                       style: TextStyle(
                         fontSize: 12,
-                        color: dataHoraVisita == null
+                        color: dataHoraNeg == null
                             ? Colors.grey
-                            : visitaPassada
+                            : passada
                                 ? Colors.grey
-                                : visitaHoje
+                                : hoje
                                     ? Colors.red
                                     : Colors.blue,
                         fontWeight: FontWeight.w500,
@@ -437,24 +599,40 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                       title: const Text('Confirmar exclusão'),
                       content: Text('Tem certeza que deseja excluir $titulo?'),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Excluir', style: TextStyle(color: Colors.red))),
+                        TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, false),
+                            child: const Text('Cancelar')),
+                        TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, true),
+                            child: const Text('Excluir',
+                                style: TextStyle(color: Colors.red))),
                       ],
                     ),
                   );
                   if (confirmar == true) {
                     try {
-                      await _client.from('clientes').delete().eq('id', c['id']);
+                      await _client
+                          .from('clientes')
+                          .delete()
+                          .eq('id', c['id']);
                       widget.onClienteRemovido();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Cliente excluído com sucesso'), backgroundColor: Colors.green),
+                          const SnackBar(
+                              content:
+                                  Text('Cliente excluído com sucesso'),
+                              backgroundColor: Colors.green),
                         );
                       }
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erro ao excluir cliente: $e'), backgroundColor: Colors.red),
+                          SnackBar(
+                              content:
+                                  Text('Erro ao excluir cliente: $e'),
+                              backgroundColor: Colors.red),
                         );
                       }
                     }
@@ -500,48 +678,63 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     final observacoesCtrl = TextEditingController(text: observacoes);
     String? _statusTecEd = statusTec.isEmpty ? null : statusTec;
 
-    final String dataBanco = (c['data_negociacao'] ?? '') as String;
-    final String horaBanco = (c['hora_negociacao'] ?? '') as String;
+    final dynamic rawData = c['data_negociacao'];
+    final String rawDataStr = rawData?.toString() ?? '';
+    final String horaBanco = (c['hora_negociacao'] ?? '').toString();
 
-    DateTime? _dataVisitaEd = dataBanco.isNotEmpty
-      ? DateTime.tryParse(dataBanco)
-      : null;
-
-    TimeOfDay? _horaVisitaEd;
-    if (horaBanco.isNotEmpty) {
-      final partes = horaBanco.split(':');
-      if (partes.length == 2) {
-        int hora = int.tryParse(partes[0]) ?? 0;
-        int minuto = int.tryParse(partes[1]) ?? 0;
-        _horaVisitaEd = TimeOfDay(hour: hora, minute: minuto);
+    DateTime? _dataNegociacaoEd;
+    if (rawDataStr.isNotEmpty) {
+      final parsed = DateTime.tryParse(rawDataStr);
+      if (parsed != null) {
+        _dataNegociacaoEd =
+            DateTime(parsed.year, parsed.month, parsed.day); 
       }
     }
 
-    final dataVisitaCtrl = TextEditingController(
-        text: _dataVisitaEd != null ? DateFormat('dd/MM/yyyy').format(_dataVisitaEd) : '');
-    final horaVisitaCtrl = TextEditingController(
-        text: _horaVisitaEd != null ? _horaVisitaEd.format(context) : '');
+    TimeOfDay? _horaNegociacaoEd;
+    if (horaBanco.isNotEmpty) {
+      final partes = horaBanco.split(':');
+      if (partes.length == 2) {
+        final h = int.tryParse(partes[0]) ?? 0;
+        final m = int.tryParse(partes[1]) ?? 0;
+        _horaNegociacaoEd = TimeOfDay(hour: h, minute: m);
+      }
+    }
+
+    final dataNegociacaoCtrl = TextEditingController(
+        text: _dataNegociacaoEd != null
+            ? DateFormat('dd/MM/yyyy').format(_dataNegociacaoEd!)
+            : '');
+    final horaNegociacaoCtrl = TextEditingController(
+        text: _horaNegociacaoEd != null
+            ? _horaNegociacaoEd!.format(context)
+            : '');
 
     Future<void> _selecionarData(BuildContext context) async {
       final data = await showDatePicker(
         context: context,
-        initialDate: _dataVisitaEd ?? DateTime.now(),
+        initialDate: _dataNegociacaoEd ?? DateTime.now(),
         firstDate: DateTime(2000),
         lastDate: DateTime(2100),
       );
       if (data == null) return;
-      _dataVisitaEd = data;
-      dataVisitaCtrl.text = DateFormat('dd/MM/yyyy').format(data);
+      setState(() {
+        _dataNegociacaoEd = data;
+        dataNegociacaoCtrl.text =
+            DateFormat('dd/MM/yyyy').format(_dataNegociacaoEd!);
+      });
     }
 
     Future<void> _selecionarHora(BuildContext context) async {
       final hora = await showTimePicker(
         context: context,
-        initialTime: _horaVisitaEd ?? TimeOfDay.now(),
+        initialTime: _horaNegociacaoEd ?? TimeOfDay.now(),
       );
       if (hora == null) return;
-      _horaVisitaEd = hora;
-      horaVisitaCtrl.text = hora.format(context);
+      setState(() {
+        _horaNegociacaoEd = hora;
+        horaNegociacaoCtrl.text = _horaNegociacaoEd!.format(context);
+      });
     }
 
     String montarLogradouroAbrev(String? tipoCheio) =>
@@ -550,7 +743,8 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -573,19 +767,29 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.edit_location_alt_outlined, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                          child: Icon(Icons.edit_location_alt_outlined,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             c['estabelecimento'] ?? c['nome'] ?? 'Cliente',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context), tooltip: 'Fechar')
+                        IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                            tooltip: 'Fechar')
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -598,11 +802,15 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                             isExpanded: true,
                             value: _statusTecEd,
                             items: _statusOptions
-                                .map((s) => DropdownMenuItem<String>(value: s['value']!, child: Text(s['label']!)))
+                                .map((s) => DropdownMenuItem<String>(
+                                    value: s['value']!,
+                                    child: Text(s['label']!)))
                                 .toList(),
                             onChanged: (v) => _statusTecEd = v,
-                            decoration: _decoracaoCampo(context, 'Status'),
-                            validator: (v) => v == null || v.isEmpty ? 'Status é obrigatório' : null,
+                            decoration:
+                                _decoracaoCampo(context, 'Status'),
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Status é obrigatório' : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -610,12 +818,18 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 2,
                           child: TextFormField(
                             controller: valorCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: _decoracaoCampo(context, 'Valor da proposta', hint: 'Ex: 1500,00'),
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                            decoration: _decoracaoCampo(
+                                context, 'Valor da proposta',
+                                hint: 'Ex: 1500,00'),
                             validator: (v) {
                               final raw = (v ?? '').trim();
                               if (raw.isEmpty) return null;
-                              final norm = raw.replaceAll('.', '').replaceAll(',', '.');
+                              final norm = raw
+                                  .replaceAll('.', '')
+                                  .replaceAll(',', '.');
                               final parsed = num.tryParse(norm);
                               if (parsed == null) return 'Valor inválido';
                               if (parsed < 0) return 'Valor não pode ser negativo';
@@ -633,17 +847,30 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             isExpanded: true,
-                            value: _tiposLogradouro.contains(_tipoLogradouroEd) ? _tipoLogradouroEd : null,
-                            items: _tiposLogradouro.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                            value: _tiposLogradouro
+                                    .contains(_tipoLogradouroEd)
+                                ? _tipoLogradouroEd
+                                : null,
+                            items: _tiposLogradouro
+                                .map((e) => DropdownMenuItem(
+                                    value: e, child: Text(e)))
+                                .toList(),
                             selectedItemBuilder: (context) {
                               return _tiposLogradouro.map((e) {
                                 final abreviado = _abbr[e] ?? e;
-                                return Align(alignment: Alignment.centerLeft, child: Text(abreviado, overflow: TextOverflow.ellipsis));
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(abreviado,
+                                      overflow: TextOverflow.ellipsis),
+                                );
                               }).toList();
                             },
-                            onChanged: (v) => setState(() => _tipoLogradouroEd = v),
-                            decoration: _decoracaoCampo(context, 'Tipo'),
-                            validator: (v) => v == null || v.isEmpty ? 'Tipo é obrigatório' : null,
+                            onChanged: (v) =>
+                                setState(() => _tipoLogradouroEd = v),
+                            decoration:
+                                _decoracaoCampo(context, 'Tipo'),
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Tipo é obrigatório' : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -651,8 +878,13 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 4,
                           child: TextFormField(
                             controller: nomeViaCtrl,
-                            decoration: _decoracaoCampo(context, 'Nome da via', hint: 'Ex: Tiradentes'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Nome da via é obrigatório' : null,
+                            decoration: _decoracaoCampo(
+                                context, 'Nome da via',
+                                hint: 'Ex: Tiradentes'),
+                            validator: (v) => (v == null ||
+                                    v.trim().isEmpty)
+                                ? 'Nome da via é obrigatório'
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -660,8 +892,13 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           flex: 2,
                           child: TextFormField(
                             controller: numeroCtrl,
-                            decoration: _decoracaoCampo(context, 'Número', hint: '123'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Número é obrigatório' : null,
+                            decoration: _decoracaoCampo(
+                                context, 'Número',
+                                hint: '123'),
+                            validator: (v) => (v == null ||
+                                    v.trim().isEmpty)
+                                ? 'Número é obrigatório'
+                                : null,
                           ),
                         ),
                       ],
@@ -673,16 +910,26 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                         Expanded(
                           child: TextFormField(
                             controller: bairroCtrl,
-                            decoration: _decoracaoCampo(context, 'Bairro', hint: 'Jardim ...'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Bairro é obrigatório' : null,
+                            decoration: _decoracaoCampo(
+                                context, 'Bairro',
+                                hint: 'Jardim ...'),
+                            validator: (v) => (v == null ||
+                                    v.trim().isEmpty)
+                                ? 'Bairro é obrigatório'
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(
                             controller: cidadeCtrl,
-                            decoration: _decoracaoCampo(context, 'Cidade', hint: 'Londrina'),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Cidade é obrigatório' : null,
+                            decoration: _decoracaoCampo(
+                                context, 'Cidade',
+                                hint: 'Londrina'),
+                            validator: (v) => (v == null ||
+                                    v.trim().isEmpty)
+                                ? 'Cidade é obrigatório'
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -690,12 +937,18 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           width: 90,
                           child: TextFormField(
                             controller: estadoCtrl,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: _decoracaoCampo(context, 'UF', hint: 'PR'),
+                            textCapitalization:
+                                TextCapitalization.characters,
+                            decoration: _decoracaoCampo(
+                                context, 'UF',
+                                hint: 'PR'),
                             validator: (v) {
-                              final x = v?.trim().toUpperCase() ?? '';
+                              final x =
+                                  v?.trim().toUpperCase() ?? '';
                               if (x.isEmpty) return 'UF é obrigatório';
-                              if (x.length != 2) return 'UF deve ter 2 letras';
+                              if (x.length != 2) {
+                                return 'UF deve ter 2 letras';
+                              }
                               return null;
                             },
                           ),
@@ -706,14 +959,18 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
 
                     TextFormField(
                       controller: complementoCtrl,
-                      decoration: _decoracaoCampo(context, 'Complemento', hint: 'Ap, bloco, casa, sala'),
+                      decoration: _decoracaoCampo(
+                          context, 'Complemento',
+                          hint: 'Ap, bloco, casa, sala'),
                     ),
                     const SizedBox(height: 12),
 
                     TextFormField(
                       controller: observacoesCtrl,
                       maxLines: 3,
-                      decoration: _decoracaoCampo(context, 'Observações', hint: 'Notas sobre a negociação'),
+                      decoration: _decoracaoCampo(
+                          context, 'Observações',
+                          hint: 'Notas sobre a negociação'),
                     ),
 
                     const SizedBox(height: 12),
@@ -722,12 +979,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                       children: [
                         Expanded(
                           child: TextFormField(
-                            controller: dataVisitaCtrl,
+                            controller: dataNegociacaoCtrl,
                             readOnly: true,
-                            decoration: _decoracaoCampo(context, 'Data da Visita', hint: 'Selecione a data da visita'),
+                            decoration: _decoracaoCampo(
+                                context, 'Data da Negociação',
+                                hint: 'Selecione a data'),
                             onTap: () => _selecionarData(context),
                             validator: (v) {
-                              if (v == null || v.isEmpty) return 'Data da visita é obrigatória';
+                              if (v == null || v.isEmpty) {
+                                return 'Data da negociação é obrigatória';
+                              }
                               return null;
                             },
                           ),
@@ -735,12 +996,16 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(
-                            controller: horaVisitaCtrl,
+                            controller: horaNegociacaoCtrl,
                             readOnly: true,
-                            decoration: _decoracaoCampo(context, 'Hora da Visita', hint: 'Selecione a hora da visita'),
+                            decoration: _decoracaoCampo(
+                                context, 'Hora da Negociação',
+                                hint: 'Selecione a hora'),
                             onTap: () => _selecionarHora(context),
                             validator: (v) {
-                              if (v == null || v.isEmpty) return 'Hora da visita é obrigatória';
+                              if (v == null || v.isEmpty) {
+                                return 'Hora da negociação é obrigatória';
+                              }
                               return null;
                             },
                           ),
@@ -757,73 +1022,111 @@ class _MeusClientesTabState extends State<MeusClientesTab> {
                           foregroundColor: Colors.white,
                         ),
                         onPressed: () async {
-                          if (!(formKey.currentState?.validate() ?? false)) return;
+                          if (!(formKey.currentState?.validate() ?? false)) {
+                            return;
+                          }
 
                           num? valor;
                           final raw = valorCtrl.text.trim();
                           if (raw.isNotEmpty) {
-                            final norm = raw.replaceAll('.', '').replaceAll(',', '.');
+                            final norm = raw
+                                .replaceAll('.', '')
+                                .replaceAll(',', '.');
                             valor = num.tryParse(norm);
                           }
 
                           final nomeViaPuro = nomeViaCtrl.text.trim();
-                          if (_tipoLogradouroEd == null || _tipoLogradouroEd!.isEmpty) {
+                          if (_tipoLogradouroEd == null ||
+                              _tipoLogradouroEd!.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Selecione o Tipo (logradouro).'), backgroundColor: Colors.red),
+                              const SnackBar(
+                                  content: Text(
+                                      'Selecione o Tipo (logradouro).'),
+                                  backgroundColor: Colors.red),
                             );
                             return;
                           }
                           if (nomeViaPuro.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Informe o Nome da via.'), backgroundColor: Colors.red),
+                              const SnackBar(
+                                  content:
+                                      Text('Informe o Nome da via.'),
+                                  backgroundColor: Colors.red),
                             );
                             return;
                           }
-                          if (_dataVisitaEd == null) {
+                          if (_dataNegociacaoEd == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Informe a Data da visita.'), backgroundColor: Colors.red),
+                              const SnackBar(
+                                  content: Text(
+                                      'Informe a Data da negociação.'),
+                                  backgroundColor: Colors.red),
                             );
                             return;
                           }
-                          if (_horaVisitaEd == null) {
+                          if (_horaNegociacaoEd == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Informe a Hora da visita.'), backgroundColor: Colors.red),
+                              const SnackBar(
+                                  content: Text(
+                                      'Informe a Hora da negociação.'),
+                                  backgroundColor: Colors.red),
                             );
                             return;
                           }
 
-                          final logradouroAbrev = montarLogradouroAbrev(_tipoLogradouroEd);
+                          final logradouroAbrev =
+                              montarLogradouroAbrev(_tipoLogradouroEd);
 
-                          final dataSalvar = DateFormat('yyyy-MM-dd').format(_dataVisitaEd!);
-                          final horaSalvar = '${_horaVisitaEd!.hour.toString().padLeft(2, '0')}:${_horaVisitaEd!.minute.toString().padLeft(2, '0')}';
+                          final dataSalvar = DateFormat('yyyy-MM-dd')
+                              .format(_dataNegociacaoEd!);
+                          final horaSalvar =
+                              '${_horaNegociacaoEd!.hour.toString().padLeft(2, '0')}:${_horaNegociacaoEd!.minute.toString().padLeft(2, '0')}';
 
                           try {
-                            await _client.from('clientes').update({
-                              'status_negociacao': _statusTecEd,
-                              'valor_proposta': valor,
-                              'logradouro': logradouroAbrev,
-                              'endereco': nomeViaPuro,
-                              'numero': numeroCtrl.text.trim(),
-                              'bairro': bairroCtrl.text.trim(),
-                              'cidade': cidadeCtrl.text.trim(),
-                              'estado': estadoCtrl.text.trim().toUpperCase(),
-                              'complemento': complementoCtrl.text.trim().isNotEmpty ? complementoCtrl.text.trim() : null,
-                              'observacoes': observacoesCtrl.text.trim().isNotEmpty ? observacoesCtrl.text.trim() : null,
-                              'data_negociacao': dataSalvar,
-                              'hora_negociacao': horaSalvar,
-                            }).eq('id', c['id']);
+                            await _client
+                                .from('clientes')
+                                .update({
+                                  'status_negociacao': _statusTecEd,
+                                  'valor_proposta': valor,
+                                  'logradouro': logradouroAbrev,
+                                  'endereco': nomeViaPuro,
+                                  'numero': numeroCtrl.text.trim(),
+                                  'bairro': bairroCtrl.text.trim(),
+                                  'cidade': cidadeCtrl.text.trim(),
+                                  'estado':
+                                      estadoCtrl.text.trim().toUpperCase(),
+                                  'complemento': complementoCtrl.text
+                                          .trim()
+                                          .isNotEmpty
+                                      ? complementoCtrl.text.trim()
+                                      : null,
+                                  'observacoes': observacoesCtrl.text
+                                          .trim()
+                                          .isNotEmpty
+                                      ? observacoesCtrl.text.trim()
+                                      : null,
+                                  'data_negociacao': dataSalvar,
+                                  'hora_negociacao': horaSalvar,
+                                })
+                                .eq('id', c['id']);
 
                             if (mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Cliente atualizado com sucesso'), backgroundColor: Colors.green),
+                                const SnackBar(
+                                    content: Text(
+                                        'Cliente atualizado com sucesso'),
+                                    backgroundColor: Colors.green),
                               );
                               setState(() {});
                             }
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
+                                SnackBar(
+                                    content:
+                                        Text('Erro ao salvar: $e'),
+                                    backgroundColor: Colors.red),
                               );
                             }
                           }

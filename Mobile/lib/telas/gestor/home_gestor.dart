@@ -169,6 +169,9 @@ class _HomeGestorState extends State<HomeGestor> {
   void initState() {
     super.initState();
     _carregarLeads(initial: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarQtdAvisos();
+    });
   }
 
   @override
@@ -190,6 +193,42 @@ class _HomeGestorState extends State<HomeGestor> {
         .map((r) => (r['uid'] ?? '').toString())
         .where((s) => s.isNotEmpty)
         .toList();
+  }
+
+  // Conta avisos: notificacoes reais + avisos sintéticos (84+ dias)
+  Future<void> _carregarQtdAvisos() async {
+    try {
+      final uid = _sb.auth.currentUser?.id;
+
+      int countDb = 0;
+      if (uid != null) {
+        final rows = await _sb
+            .from('notificacoes')
+            .select('*')
+            .eq('user_id', uid)
+            .eq('lido', false);
+        countDb = (rows as List).length;
+      }
+
+      final int countSinteticos = _contarAvisosSinteticos();
+
+      if (!mounted) return;
+      setState(() => _qtdAvisos = countDb + countSinteticos);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _qtdAvisos = _contarAvisosSinteticos());
+    }
+  }
+
+  int _contarAvisosSinteticos() {
+    int total = 0;
+    for (final c in _leads) {
+      final dias = (c['dias'] as int?) ?? -1;
+      if (dias >= 84) {
+        total++;
+      }
+    }
+    return total;
   }
 
   Future<void> _notificarAlertas() async {
@@ -357,6 +396,8 @@ class _HomeGestorState extends State<HomeGestor> {
         _loadingMore = false;
       });
 
+      await _carregarQtdAvisos();
+
       if (initial) {
         await _notificarAlertas();
       }
@@ -426,7 +467,7 @@ class _HomeGestorState extends State<HomeGestor> {
                           child: GestorHeaderRow(
                             totalGeral: totalGeral,
                             totalFiltro: totalFiltro,
-                            avisosNaoLidos: _qtdAvisos, 
+                            avisosNaoLidos: _qtdAvisos,
                             onAvisos: () async {
                               await _notificarAlertas();
                               showModalBottomSheet(
@@ -442,7 +483,9 @@ class _HomeGestorState extends State<HomeGestor> {
                                   leads: _leads,
                                   onChanged: (totalNaoLidas) {
                                     if (!mounted) return;
-                                    setState(() => _qtdAvisos = totalNaoLidas);
+                                    setState(
+                                      () => _qtdAvisos = totalNaoLidas,
+                                    );
                                   },
                                 ),
                               );

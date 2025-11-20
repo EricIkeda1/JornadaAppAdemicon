@@ -1218,7 +1218,7 @@ class CadastrarClienteState extends State<CadastrarCliente> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'A data_visita e a hora_visita serão definidas automaticamente '
+                                      'A data da visita e a hora da visita serão definidas automaticamente'
                                       'com a data e hora atuais do dispositivo no momento em que você salvar o cliente.',
                                       style: Theme.of(
                                               context)
