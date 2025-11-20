@@ -104,12 +104,13 @@ class _AvisosSheetState extends State<AvisosSheet> {
       List realRows = [];
       if (uid != null) {
         realRows = await _sb
-                .from('notificacoes')
-                .select('id, user_id, ref, tipo, titulo, mensagem, data, lido')
-                .eq('user_id', uid)
-                .order('data', ascending: false)
-                .range(start, end)
-            as List;
+            .from('notificacoes')
+            .select(
+              'id, user_id, origin_user_id, ref, tipo, titulo, mensagem, link, prioridade, data, lido',
+            )
+            .eq('user_id', uid)
+            .order('data', ascending: false)
+            .range(start, end) as List;
       }
 
       final reais = <_Aviso>[];
@@ -124,6 +125,9 @@ class _AvisosSheetState extends State<AvisosSheet> {
                 DateTime.now(),
             lido: (r['lido'] ?? false) == true,
             ref: (r['ref'] ?? '').toString(),
+            link: (r['link'] ?? '').toString(),
+            prioridade: (r['prioridade'] ?? '').toString(),
+            originUserId: r['origin_user_id']?.toString(),
           ),
         );
       }
@@ -171,7 +175,9 @@ class _AvisosSheetState extends State<AvisosSheet> {
     try {
       final uid = _sb.auth.currentUser?.id;
       if (uid != null) {
-        await _sb.from('notificacoes').update({'lido': true}).eq('user_id', uid);
+        await _sb
+            .from('notificacoes')
+            .update({'lido': true}).eq('user_id', uid);
       }
       setState(() {
         for (var i = 0; i < _itens.length; i++) {
@@ -212,8 +218,8 @@ class _AvisosSheetState extends State<AvisosSheet> {
                   ),
                   if (_novas > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 7),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                       decoration: BoxDecoration(
                         color: const Color(0xFFED1C24),
                         borderRadius: BorderRadius.circular(10),
@@ -379,6 +385,9 @@ class _Aviso {
   final DateTime data;
   final bool lido;
   final String ref;
+  final String link;
+  final String prioridade;
+  final String? originUserId;
 
   const _Aviso({
     required this.id,
@@ -388,6 +397,9 @@ class _Aviso {
     required this.data,
     required this.lido,
     this.ref = '',
+    this.link = '',
+    this.prioridade = '',
+    this.originUserId,
   });
 
   bool get isRedBorder =>
@@ -436,6 +448,9 @@ class _Aviso {
     DateTime? data,
     bool? lido,
     String? ref,
+    String? link,
+    String? prioridade,
+    String? originUserId,
   }) {
     return _Aviso(
       id: id ?? this.id,
@@ -445,6 +460,9 @@ class _Aviso {
       data: data ?? this.data,
       lido: lido ?? this.lido,
       ref: ref ?? this.ref,
+      link: link ?? this.link,
+      prioridade: prioridade ?? this.prioridade,
+      originUserId: originUserId ?? this.originUserId,
     );
   }
 }
