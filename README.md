@@ -27,7 +27,7 @@ O **JornadaAppAdemicon** é uma solução completa de gestão de clientes e visi
 - ✅ Notificações de Lead próximo de caducar (penúltima semana)
 - ✅ Auditoria de transferências de Lead entre consultores
 
-## 🛠️ Stack técnica
+## Stack técnica
 
 - **Flutter** 3.x / **Dart** 3.x
 - **Supabase** (Auth + Postgres + RLS)
@@ -39,7 +39,7 @@ O **JornadaAppAdemicon** é uma solução completa de gestão de clientes e visi
   - `mask_text_input_formatter` - máscaras de telefone/CEP
   - `uuid` - geração de IDs únicos
     
-## 🔄 Como funciona o Offline‑First
+## Como funciona o Offline‑First
 
 ### 1. Salvar cliente
 
@@ -61,7 +61,7 @@ O **JornadaAppAdemicon** é uma solução completa de gestão de clientes e visi
 
 - Se houver internet real + sessão válida, tenta drenar a fila no startup
 
-## 📊 Regras de importação (Excel para CRM)
+## Regras de importação (Excel para CRM)
 
 - **Até 6 colunas** por arquivo; ordem não importa, apenas os títulos
 - **Títulos aceitos** (exatos): `nome`, `codigo_pais`, `celular`, `data_nascimento`, `email`, `classificacao`, `obs`
