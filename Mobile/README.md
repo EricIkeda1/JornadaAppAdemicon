@@ -31,16 +31,15 @@ Depois de clonar, a pasta deve conter arquivos como `pubspec.yaml`, `lib`, `andr
 
 ---
 
-## 3. Criar e configurar o arquivo `.env` na raiz do Mobile
+## 3. Arquivo `.env` na raiz do Mobile
 
-> Importante: **sem o `.env` na pasta raiz do projeto mobile, o app abre mas não consegue acessar nada (sem autenticação, sem listar dados, sem sincronizar).**
+> Importante: **sem o arquivo `.env` na pasta raiz do projeto mobile, o app abre mas não consegue acessar nada (sem autenticação, sem listar dados, sem sincronizar).**
 
-1. Na raiz do projeto Flutter (onde está o `pubspec.yaml`), crie um arquivo chamado `.env`.  
-2. Preencha com as variáveis usadas no código, por exemplo:  
-   - `SUPABASE_URL=...`  
-   - `SUPABASE_ANON_KEY=...`  
-3. Use os valores do seu projeto Supabase (URL e chave anônima corretas).  
-4. Confirme que o arquivo `.env` está exatamente na raiz do app mobile, não em subpastas.  
+O arquivo `.env` contém as configurações sensíveis necessárias para o app se conectar ao Supabase (URL, chaves, etc.).  
+Esse arquivo **não é público** e **será fornecido somente se solicitado e/ou devidamente autorizado**.
+
+Coloque o arquivo `.env` fornecido diretamente na raiz do projeto Flutter (mesmo nível do `pubspec.yaml`).  
+Certifique‑se de que ele está exatamente na raiz do app mobile, e não em subpastas.
 
 ---
 
