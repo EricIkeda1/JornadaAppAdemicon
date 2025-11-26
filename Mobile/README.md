@@ -84,4 +84,4 @@ Se o `.env` não estiver presente na raiz ou estiver com chaves erradas, o app a
 - Garanta que o `.env` tenha, no mínimo:  
   - `SUPABASE_URL`  
   - `SUPABASE_ANON_KEY`  
-- Use as credenciais do projeto Supabase correto (dev, homolog ou prod).  
+- Use as credenciais do projeto Supabase correto.  
