@@ -1,6 +1,6 @@
 # Tutorial completo: JornadaAppAdemicon (Flutter + GitHub)
 
-Este arquivo reúne o passo a passo para instalar, rodar o app Flutter localmente e usar o projeto como seu repositório no GitHub. [web:1]
+Este arquivo reúne o passo a passo para instalar, rodar o app Flutter localmente e usar o projeto como seu repositório no GitHub.
 
 ---
 
@@ -27,7 +27,7 @@ No terminal, execute na ordem:
 2. `git clone https://github.com/EricIkeda1/JornadaAppAdemicon.git`  
 3. `cd JornadaAppAdemicon`  
 
-Depois de clonar, a pasta deve conter arquivos como `pubspec.yaml`, `lib`, `android`, `ios` etc. [web:25]
+Depois de clonar, a pasta deve conter arquivos como `pubspec.yaml`, `lib`, `android`, `ios` etc. 
 
 ---
 
@@ -49,7 +49,7 @@ Certifique‑se de que ele está exatamente na raiz do app mobile, e não em sub
 2. Menu: `File -> Open Folder`.  
 3. Selecione a pasta do projeto, por exemplo:  
    `C:\Projetos\Mobile\JornadaAppAdemicon`  
-4. Aguarde o VS Code reconhecer o projeto Flutter. [web:25]  
+4. Aguarde o VS Code reconhecer o projeto Flutter. 
 
 ---
 
@@ -61,7 +61,7 @@ No terminal integrado do VS Code (Ctrl + `), execute, um por vez:
 2. `flutter pub get`  
 3. `flutter doctor`  
 
-Verifique se o `flutter doctor` não mostra erros críticos. [web:1]  
+Verifique se o `flutter doctor` não mostra erros críticos.
 
 ---
 
