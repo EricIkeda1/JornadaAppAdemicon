@@ -1,12 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../components/enderecos_service.dart';
 
 const Color kRed = Color(0xFFED3B2E);
 const Color kRedLight = Color(0xFFFFE5E3);
 const Color kBorder = Color(0xFFE8E8E8);
 const Color kBg = Color(0xFFF7F7F7);
 const Color kShadow10 = Color(0x1A000000);
+
+const Map<String, String> kEstadosBR = {
+  'AC': 'Acre',
+  'AL': 'Alagoas',
+  'AP': 'Amapá',
+  'AM': 'Amazonas',
+  'BA': 'Bahia',
+  'CE': 'Ceará',
+  'DF': 'Distrito Federal',
+  'ES': 'Espírito Santo',
+  'GO': 'Goiás',
+  'MA': 'Maranhão',
+  'MT': 'Mato Grosso',
+  'MS': 'Mato Grosso do Sul',
+  'MG': 'Minas Gerais',
+  'PA': 'Pará',
+  'PB': 'Paraíba',
+  'PR': 'Paraná',
+  'PE': 'Pernambuco',
+  'PI': 'Piauí',
+  'RJ': 'Rio de Janeiro',
+  'RN': 'Rio Grande do Norte',
+  'RS': 'Rio Grande do Sul',
+  'RO': 'Rondônia',
+  'RR': 'Roraima',
+  'SC': 'Santa Catarina',
+  'SP': 'São Paulo',
+  'SE': 'Sergipe',
+  'TO': 'Tocantins',
+};
+
+class BairroResumo {
+  final String nome;
+  final List<String> enderecos;
+
+  BairroResumo({
+    required this.nome,
+    required this.enderecos,
+  });
+}
+
+class CidadeResumo {
+  final String nome; 
+  final List<BairroResumo> bairros;
+
+  CidadeResumo({
+    required this.nome,
+    required this.bairros,
+  });
+}
 
 class EnderecosPage extends StatefulWidget {
   const EnderecosPage({super.key});
@@ -16,8 +65,8 @@ class EnderecosPage extends StatefulWidget {
 }
 
 class _EnderecosPageState extends State<EnderecosPage> {
-  late final EnderecosService _service;
-  late Future<Map<String, List<BairroResumo>>> _future;
+  late final SupabaseClient _client;
+  late Future<Map<String, List<CidadeResumo>>> _future;
 
   static const int _pageSize = 10;
   int _visibleCount = _pageSize;
@@ -25,21 +74,172 @@ class _EnderecosPageState extends State<EnderecosPage> {
   @override
   void initState() {
     super.initState();
-    _service = EnderecosService(Supabase.instance.client);
-    _future = _service.listarAgrupadoPorCidade();
+    _client = Supabase.instance.client;
+    _future = _listarHierarquiaDoMeuTime();
+  }
+
+  String _normalizeName(String s) {
+    final lower = s.trim().toLowerCase();
+    if (lower.isEmpty) return '';
+    return lower
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .map((p) => p[0].toUpperCase() + p.substring(1))
+        .join(' ');
+  }
+
+  String _cleanLogradouro(String s) {
+    var t = s.trim();
+
+    t = t.replaceAll(
+      RegExp(r'^(r\.?\s*)+(rua\s*)', caseSensitive: false),
+      'Rua ',
+    );
+    t = t.replaceAll(
+      RegExp(r'^(av\.?\s*)+(avenida\s*)', caseSensitive: false),
+      'Avenida ',
+    );
+    t = t.replaceAll(
+      RegExp(r'^(r\.?\s+)(?=\S)', caseSensitive: false),
+      'Rua ',
+    );
+    t = t.replaceAll(
+      RegExp(r'^(av\.?\s+)(?=\S)', caseSensitive: false),
+      'Avenida ',
+    );
+
+    return _normalizeName(t);
+  }
+
+  String _stripViaPrefix(String s) {
+    var t = s.trim();
+    t = t.replaceAll(
+      RegExp(r'^(r\.?\s+|rua\s+)', caseSensitive: false),
+      '',
+    );
+    t = t.replaceAll(
+      RegExp(r'^(av\.?\s+|avenida\s+)', caseSensitive: false),
+      '',
+    );
+    return _normalizeName(t);
+  }
+
+  Future<String?> _getGestorIdDoUsuario() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    final data = await _client
+        .from('gestor')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    final gestorId = data?['id'] as String?;
+    print('gestorId: $gestorId');
+    return gestorId;
+  }
+
+  Future<Map<String, List<CidadeResumo>>> _listarHierarquiaDoMeuTime() async {
+    final gestorId = await _getGestorIdDoUsuario();
+    if (gestorId == null) return {};
+
+    final consultores = await _client
+        .from('consultores')
+        .select('uid')
+        .eq('gestor_id', gestorId);
+
+    print('consultores do time: $consultores');
+
+    final uids = (consultores as List)
+        .map((c) => c['uid'] as String)
+        .toList();
+
+    print('uids do time: $uids');
+
+    if (uids.isEmpty) return {};
+
+    final data = await _client
+        .from('clientes')
+        .select(
+            'estado,cidade,bairro,logradouro,endereco,numero,consultor_uid_t')
+        .inFilter('consultor_uid_t', uids)
+        .order('estado')
+        .order('cidade')
+        .order('bairro');
+
+    print('clientes filtrados: $data'); 
+
+    final Map<String, Map<String, Map<String, List<String>>>> tmp = {};
+
+    for (final row in data) {
+      final estadoSiglaRaw = (row['estado'] ?? '') as String;
+      final cidadeRaw = (row['cidade'] ?? '') as String;
+      final bairroRaw = (row['bairro'] ?? '') as String;
+
+      final logradouroRaw = (row['logradouro'] ?? '') as String;
+      final enderecoRaw = (row['endereco'] ?? '') as String;
+      final numero = row['numero']?.toString() ?? '';
+
+      final estadoKey = estadoSiglaRaw.trim().toUpperCase();
+      final cidadeKey = _normalizeName(cidadeRaw);
+      final bairroKey = _normalizeName(bairroRaw);
+
+      final logradouro = _cleanLogradouro(logradouroRaw);
+
+      var endereco = _stripViaPrefix(enderecoRaw);
+
+      if (logradouro.isNotEmpty &&
+          endereco.toLowerCase().startsWith(logradouro.toLowerCase())) {
+        endereco = endereco.substring(logradouro.length).trimLeft();
+      }
+
+      if (estadoKey.isEmpty || cidadeKey.isEmpty || bairroKey.isEmpty) {
+        continue;
+      }
+      if (logradouro.isEmpty && endereco.isEmpty) continue;
+
+      final textoEndereco = endereco.isEmpty
+          ? '$logradouro, $numero'
+          : '$logradouro $endereco, $numero';
+
+      tmp.putIfAbsent(estadoKey, () => {});
+      tmp[estadoKey]!.putIfAbsent(cidadeKey, () => {});
+      tmp[estadoKey]![cidadeKey]!.putIfAbsent(bairroKey, () => []);
+      tmp[estadoKey]![cidadeKey]![bairroKey]!.add(textoEndereco);
+    }
+
+    final Map<String, List<CidadeResumo>> resultado = {};
+    tmp.forEach((estadoSigla, cidadesMap) {
+      final cidades = <CidadeResumo>[];
+      cidadesMap.forEach((cidadeNomeNorm, bairrosMap) {
+        final bairros = bairrosMap.entries
+            .map(
+              (e) => BairroResumo(
+                nome: e.key,
+                enderecos: e.value,
+              ),
+            )
+            .toList();
+        cidades.add(CidadeResumo(nome: cidadeNomeNorm, bairros: bairros));
+      });
+      cidades.sort((a, b) => a.nome.compareTo(b.nome));
+      resultado[estadoSigla] = cidades;
+    });
+
+    return resultado;
   }
 
   void _recarregar() {
     setState(() {
-      _future = _service.listarAgrupadoPorCidade();
+      _future = _listarHierarquiaDoMeuTime();
       _visibleCount = _pageSize;
     });
   }
 
-  void _verMais(int totalCidades) {
+  void _verMais(int totalEstados) {
     setState(() {
       final novoLimite = _visibleCount + _pageSize;
-      _visibleCount = novoLimite > totalCidades ? totalCidades : novoLimite;
+      _visibleCount = novoLimite > totalEstados ? totalEstados : novoLimite;
     });
   }
 
@@ -52,9 +252,9 @@ class _EnderecosPageState extends State<EnderecosPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          children: const [
             Row(
-              children: const [
+              children: [
                 Icon(Icons.location_city_outlined, color: kRed),
                 SizedBox(width: 8),
                 Text(
@@ -65,14 +265,6 @@ class _EnderecosPageState extends State<EnderecosPage> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Visualize e gerencie as cidades, bairros e endereços do seu time',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
             ),
           ],
         ),
@@ -88,7 +280,7 @@ class _EnderecosPageState extends State<EnderecosPage> {
             header(),
             const SizedBox(height: 8),
             Expanded(
-              child: FutureBuilder<Map<String, List<BairroResumo>>>(
+              child: FutureBuilder<Map<String, List<CidadeResumo>>>(
                 future: _future,
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
@@ -113,18 +305,18 @@ class _EnderecosPageState extends State<EnderecosPage> {
                   final mapa = snap.data ?? {};
                   if (mapa.isEmpty) {
                     return const Center(
-                      child: Text('Nenhum endereço encontrado'),
+                      child:
+                          Text('Nenhum endereço encontrado para o seu time'),
                     );
                   }
 
-                  final cidades = mapa.entries.toList()
+                  final estados = mapa.entries.toList()
                     ..sort((a, b) => a.key.compareTo(b.key));
 
-                  final totalCidades = cidades.length;
+                  final totalEstados = estados.length;
+                  final limite = _visibleCount.clamp(0, totalEstados);
 
-                  final limite = _visibleCount.clamp(0, totalCidades);
-
-                  final mostrarBotaoVerMais = limite < totalCidades;
+                  final mostrarBotaoVerMais = limite < totalEstados;
                   final itemCount =
                       mostrarBotaoVerMais ? limite + 1 : limite;
 
@@ -139,10 +331,11 @@ class _EnderecosPageState extends State<EnderecosPage> {
                         if (mostrarBotaoVerMais && i == itemCount - 1) {
                           return Center(
                             child: TextButton.icon(
-                              onPressed: () => _verMais(totalCidades),
-                              icon: const Icon(Icons.expand_more, color: kRed),
+                              onPressed: () => _verMais(totalEstados),
+                              icon:
+                                  const Icon(Icons.expand_more, color: kRed),
                               label: const Text(
-                                'Ver mais cidades',
+                                'Ver mais estados',
                                 style: TextStyle(
                                   color: kRed,
                                   fontWeight: FontWeight.w600,
@@ -152,17 +345,30 @@ class _EnderecosPageState extends State<EnderecosPage> {
                           );
                         }
 
-                        final cidade = cidades[i].key;
-                        final bairros = cidades[i].value;
-                        final totalBairros = bairros.length;
-                        final totalEnderecos = bairros.fold<int>(
+                        final estadoSigla = estados[i].key;
+                        final cidades = estados[i].value;
+
+                        final estadoNomeCompleto =
+                            kEstadosBR[estadoSigla] ?? estadoSigla; 
+
+                        final totalCidades = cidades.length;
+                        final totalBairros = cidades.fold<int>(
                           0,
-                          (acc, b) => acc + b.enderecos.length,
+                          (acc, c) => acc + c.bairros.length,
+                        );
+                        final totalEnderecos = cidades.fold<int>(
+                          0,
+                          (acc, c) => acc +
+                              c.bairros.fold<int>(
+                                0,
+                                (acc2, b) => acc2 + b.enderecos.length,
+                              ),
                         );
 
-                        return _CidadeCard(
-                          cidade: cidade,
-                          bairros: bairros,
+                        return _EstadoCard(
+                          estadoNome: estadoNomeCompleto,
+                          cidades: cidades,
+                          totalCidades: totalCidades,
                           totalBairros: totalBairros,
                           totalEnderecos: totalEnderecos,
                         );
@@ -179,24 +385,26 @@ class _EnderecosPageState extends State<EnderecosPage> {
   }
 }
 
-class _CidadeCard extends StatefulWidget {
-  final String cidade;
-  final List<BairroResumo> bairros;
+class _EstadoCard extends StatefulWidget {
+  final String estadoNome; 
+  final List<CidadeResumo> cidades;
+  final int totalCidades;
   final int totalBairros;
   final int totalEnderecos;
 
-  const _CidadeCard({
-    required this.cidade,
-    required this.bairros,
+  const _EstadoCard({
+    required this.estadoNome,
+    required this.cidades,
+    required this.totalCidades,
     required this.totalBairros,
     required this.totalEnderecos,
   });
 
   @override
-  State<_CidadeCard> createState() => _CidadeCardState();
+  State<_EstadoCard> createState() => _EstadoCardState();
 }
 
-class _CidadeCardState extends State<_CidadeCard> {
+class _EstadoCardState extends State<_EstadoCard> {
   bool _expanded = false;
 
   BoxDecoration _cardDeco({required bool highlighted}) => BoxDecoration(
@@ -214,14 +422,14 @@ class _CidadeCardState extends State<_CidadeCard> {
         ],
       );
 
-  Widget _cityIcon() => Container(
+  Widget _stateIcon() => Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
           color: kRedLight,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.location_city_outlined, color: kRed),
+        child: const Icon(Icons.map_outlined, color: kRed),
       );
 
   Widget _badgeExpandido() => Container(
@@ -253,7 +461,7 @@ class _CidadeCardState extends State<_CidadeCard> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Row(
                 children: [
-                  _cityIcon(),
+                  _stateIcon(),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -263,7 +471,7 @@ class _CidadeCardState extends State<_CidadeCard> {
                           children: [
                             Expanded(
                               child: Text(
-                                widget.cidade,
+                                widget.estadoNome,
                                 style: const TextStyle(
                                   fontSize: 15.5,
                                   fontWeight: FontWeight.w700,
@@ -277,6 +485,20 @@ class _CidadeCardState extends State<_CidadeCard> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
+                            const Icon(
+                              Icons.location_city_outlined,
+                              size: 14,
+                              color: Color(0x99000000),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.totalCidades} cidades',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: Color(0x99000000),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                             const Icon(
                               Icons.layers_outlined,
                               size: 14,
@@ -329,9 +551,8 @@ class _CidadeCardState extends State<_CidadeCard> {
                 border: Border.all(color: kBorder),
               ),
               child: Column(
-                children: widget.bairros
-                    .map((b) => _BairroCard(bairro: b))
-                    .toList(),
+                children:
+                    widget.cidades.map((c) => _CidadeCard(cidade: c)).toList(),
               ),
             ),
         ],
@@ -340,15 +561,15 @@ class _CidadeCardState extends State<_CidadeCard> {
   }
 }
 
-class _BairroCard extends StatefulWidget {
-  final BairroResumo bairro;
-  const _BairroCard({required this.bairro});
+class _CidadeCard extends StatefulWidget {
+  final CidadeResumo cidade;
+  const _CidadeCard({required this.cidade});
 
   @override
-  State<_BairroCard> createState() => _BairroCardState();
+  State<_CidadeCard> createState() => _CidadeCardState();
 }
 
-class _BairroCardState extends State<_BairroCard> {
+class _CidadeCardState extends State<_CidadeCard> {
   bool _open = false;
 
   @override
@@ -385,7 +606,7 @@ class _BairroCardState extends State<_BairroCard> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.location_on,
+                      Icons.location_city,
                       size: 16,
                       color: kRed,
                     ),
@@ -396,7 +617,7 @@ class _BairroCardState extends State<_BairroCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.bairro.nome,
+                          widget.cidade.nome,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -405,7 +626,7 @@ class _BairroCardState extends State<_BairroCard> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${widget.bairro.enderecos.length} endereços',
+                          '${widget.cidade.bairros.length} bairros',
                           style: const TextStyle(
                             fontSize: 12.5,
                             color: Color(0x99000000),
@@ -427,11 +648,109 @@ class _BairroCardState extends State<_BairroCard> {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
+                children: widget.cidade.bairros
+                    .map((b) => _BairroCard(bairro: b))
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BairroCard extends StatefulWidget {
+  final BairroResumo bairro;
+  const _BairroCard({required this.bairro});
+
+  @override
+  State<_BairroCard> createState() => _BairroCardState();
+}
+
+class _BairroCardState extends State<_BairroCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: const BoxDecoration(
+                      color: kRedLight,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: kRed,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.bairro.nome,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF231F20),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.bairro.enderecos.length} endereços',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0x99000000),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _open ? Icons.expand_less : Icons.expand_more,
+                    color: kRed,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
                 children: widget.bairro.enderecos
                     .map(
                       (end) => Container(
                         height: 40,
-                        margin: const EdgeInsets.only(top: 8),
+                        margin: const EdgeInsets.only(top: 6),
                         alignment: Alignment.centerLeft,
                         padding:
                             const EdgeInsets.symmetric(horizontal: 12),
@@ -455,6 +774,6 @@ class _BairroCardState extends State<_BairroCard> {
             ),
         ],
       ),
-    );;
+    );
   }
 }
